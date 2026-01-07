@@ -41,6 +41,11 @@ DATABASE_URL="postgresql://user:password@localhost:5432/giftwallet?schema=public
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 JWT_EXPIRES_IN=7d
 
+# Dev-only: enable demo/sandbox login endpoint (NEVER enable in production)
+ENABLE_DEV_LOGIN=true
+# Optional: customize demo user identity
+DEV_DEMO_EMAIL=demo@giftwallet.local
+
 ENCRYPTION_KEY=your-32-byte-hex-encryption-key-here
 
 SMTP_HOST=smtp.gmail.com
@@ -64,6 +69,9 @@ TZ=Asia/Jerusalem
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Dev-only: show "Entrar como demo" + enable /sandbox auto-login
+NEXT_PUBLIC_ENABLE_DEV_LOGIN=true
 ```
 
 ### 4. Generate Encryption Key
@@ -97,6 +105,13 @@ npm run dev
 This will start:
 - Backend API: http://localhost:3001
 - Frontend App: http://localhost:3000
+
+## Sandbox / Demo Mode (no login)
+
+If you enabled the flags above:
+
+- Open `http://localhost:3000/sandbox` to auto-login as a demo user and jump into the app
+- Or go to the normal login screen and click **"Entrar como demo"**
 
 ## Testing
 

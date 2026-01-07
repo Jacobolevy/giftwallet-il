@@ -36,7 +36,9 @@ export default function SandboxPage() {
         if (!err?.response) {
           toast.error('Server is unavailable. Please wait ~30 seconds and try again.');
         } else {
-          toast.error(err.response?.data?.error?.message || err.response?.data?.message || 'Sandbox login failed');
+          toast.error(
+            err.response?.data?.error?.message || err.response?.data?.message || 'Sandbox login failed'
+          );
         }
         setLoading(false);
       }

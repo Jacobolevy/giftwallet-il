@@ -45,6 +45,7 @@ api.interceptors.response.use(
   (response: any) => {
     const isWrapped = response.data?.success !== undefined;
     const payload = isWrapped ? (response.data.data ?? response.data) : response.data;
+
     return { ...response, data: camelizeKeysDeep(payload) };
   },
   (error: any) => {
