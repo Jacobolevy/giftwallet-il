@@ -15,7 +15,6 @@ const passwordChecks = {
   hasUppercase: (pwd: string) => /[A-Z]/.test(pwd),
   hasLowercase: (pwd: string) => /[a-z]/.test(pwd),
   hasNumber: (pwd: string) => /[0-9]/.test(pwd),
-  hasSpecial: (pwd: string) => /[!@#$%^&*(),.?":{}|<>]/.test(pwd),
 };
 
 export default function SignupPage() {
@@ -43,7 +42,6 @@ export default function SignupPage() {
     hasUppercase: passwordChecks.hasUppercase(formData.password),
     hasLowercase: passwordChecks.hasLowercase(formData.password),
     hasNumber: passwordChecks.hasNumber(formData.password),
-    hasSpecial: passwordChecks.hasSpecial(formData.password),
   }), [formData.password]);
 
   const isPasswordValid = Object.values(passwordValidation).every(Boolean);
@@ -151,9 +149,6 @@ export default function SignupPage() {
                   </div>
                   <div className={`flex items-center gap-2 ${passwordValidation.hasNumber ? 'text-green-600' : 'text-gray-500'}`}>
                     {passwordValidation.hasNumber ? '✓' : '○'} One number (0-9)
-                  </div>
-                  <div className={`flex items-center gap-2 ${passwordValidation.hasSpecial ? 'text-green-600' : 'text-gray-500'}`}>
-                    {passwordValidation.hasSpecial ? '✓' : '○'} One special character (!@#$%^&*)
                   </div>
                 </div>
               )}

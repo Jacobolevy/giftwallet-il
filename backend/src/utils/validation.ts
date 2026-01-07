@@ -7,8 +7,8 @@ export const validateSignup: ValidationChain[] = [
     .withMessage('Valid email is required'),
   body('password')
     .isLength({ min: 8 })
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-    .withMessage('Password must be at least 8 characters with uppercase, lowercase, number, and special character'),
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('Password must be at least 8 characters with uppercase, lowercase, and number'),
   body('name')
     .optional()
     .trim()
