@@ -45,7 +45,7 @@ export default function SignupPage() {
         password: formData.password,
         name: formData.name || undefined,
         phone: formData.phone || undefined,
-        languagePreference: formData.languagePreference,
+        language_preference: formData.languagePreference,
       });
 
       const { user, token } = response.data;
