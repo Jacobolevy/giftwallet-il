@@ -51,7 +51,7 @@ model CardProduct {
   issuerId       String             @map("issuer_id")
   name           String
   description    String?
-  sourceUrl      String             @map("source_url")
+  sourceUrl      String             @default("") @map("source_url")
   lastVerifiedAt DateTime           @default(now()) @map("last_verified_at")
 
   issuer Issuer @relation(fields: [issuerId], references: [id], onDelete: Cascade)
