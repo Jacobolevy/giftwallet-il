@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
               {t('auth_forgot_password')}
             </h1>
             <p className="text-gray-600">
-              Enter your email and we'll send you a reset link
+              Enter your email and we will send you a reset link
             </p>
           </div>
 
