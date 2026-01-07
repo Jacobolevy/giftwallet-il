@@ -15,12 +15,7 @@ enum Language {
   en
 }
 
-enum CardStatus {
-  active
-  used
-}
-
-enum IssuerEstablishmentType {
+enum StoreAccessType {
   physical
   online
   both
@@ -36,72 +31,82 @@ model User {
   createdAt                 DateTime @default(now()) @map("created_at")
   updatedAt                 DateTime @updatedAt @map("updated_at")
 
-  cards Card[]
+  cards UserCard[]
 
   @@map("users")
 }
 
 model Issuer {
-  id              String   @id @default(uuid())
-  name            String
-  nameHe          String?  @map("name_he")
-  logoUrl         String?  @map("logo_url")
-  brandColor      String?  @map("brand_color")
-  notes           String?
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  cards          Card[]
-  establishments IssuerEstablishment[]
+  id         String        @id @default(uuid())
+  name       String
+  websiteUrl String?       @map("website_url")
+  logoUrl    String?       @map("logo_url")
+  products   CardProduct[]
 
   @@map("issuers")
 }
 
-model Card {
-  id                String     @id @default(uuid())
-  userId            String     @map("user_id")
-  issuerId          String     @map("issuer_id")
-  label             String
-  labelHe           String?    @map("label_he")
-  codeLast4         String     @map("code_last4")
-  fullCode          String?    @map("full_code") // Encrypted
-  valueInitial      Float      @map("value_initial")
-  valueCurrent      Float      @map("value_current")
-  currency          String     @default("ILS")
-  status            CardStatus @default(active)
-  notes             String?
-  photoUrl          String?    @map("photo_url")
-  createdAt         DateTime   @default(now()) @map("created_at")
-  updatedAt         DateTime   @updatedAt @map("updated_at")
+model CardProduct {
+  id             String             @id @default(uuid())
+  issuerId       String             @map("issuer_id")
+  name           String
+  description    String?
+  sourceUrl      String             @map("source_url")
+  lastVerifiedAt DateTime           @default(now()) @map("last_verified_at")
 
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  issuer          Issuer          @relation(fields: [issuerId], references: [id])
+  issuer Issuer @relation(fields: [issuerId], references: [id], onDelete: Cascade)
+  stores CardProductStore[]
+  cards  UserCard[]
 
-  @@map("gift_cards")
+  @@map("card_products")
 }
 
-model Establishment {
-  id        String   @id @default(uuid())
-  name      String
-  nameHe    String?  @map("name_he")
-  logoUrl   String?  @map("logo_url")
+model Store {
+  id         String  @id @default(uuid())
+  name       String
+  category   String?
+  websiteUrl String? @map("website_url")
+
+  products CardProductStore[]
+
+  @@map("stores")
+}
+
+model CardProductStore {
+  cardProductId String          @map("card_product_id")
+  storeId       String          @map("store_id")
+  type          StoreAccessType @default(both)
+
+  cardProduct CardProduct @relation(fields: [cardProductId], references: [id], onDelete: Cascade)
+  store       Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@id([cardProductId, storeId])
+  @@map("card_product_stores")
+}
+
+enum UserCardStatus {
+  active
+  used
+}
+
+model UserCard {
+  id            String         @id @default(uuid())
+  userId        String         @map("user_id")
+  cardProductId String         @map("card_product_id")
+  nickname      String?        @map("nickname")
+  balance       Float          @default(0)
+  expiresAt     DateTime?      @map("expires_at")
+  status        UserCardStatus @default(active)
+
+  codeLast4 String  @map("code_last4")
+  fullCode  String? @map("full_code") // Encrypted
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cardProduct CardProduct @relation(fields: [cardProductId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  issuers IssuerEstablishment[]
-
-  @@map("establishments")
-}
-
-model IssuerEstablishment {
-  id              String    @id @default(uuid())
-  issuerId        String    @map("issuer_id")
-  establishmentId String    @map("establishment_id")
-  type            IssuerEstablishmentType @default(both)
-  notes           String?   // e.g., "Online only", "Excluding sale items"
-
-  issuer        Issuer        @relation(fields: [issuerId], references: [id], onDelete: Cascade)
-  establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
-
-  @@unique([issuerId, establishmentId])
-  @@map("issuer_establishments")
+  @@map("user_cards")
 }
 

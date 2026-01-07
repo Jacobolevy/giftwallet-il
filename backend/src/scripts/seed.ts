@@ -1,196 +1,171 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, StoreAccessType } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const issuers = [
+type SeedIssuer = {
+  name: string;
+  websiteUrl?: string;
+  logoUrl?: string;
+  products: Array<{
+    name: string;
+    description?: string;
+    sourceUrl: string;
+    stores: Array<{ name: string; type?: StoreAccessType }>;
+  }>;
+};
+
+const storesCatalog: Array<{ name: string; category?: string; websiteUrl?: string }> = [
+  { name: 'Castro', category: 'fashion' },
+  { name: 'Fox', category: 'fashion' },
+  { name: 'H&M', category: 'fashion' },
+  { name: 'Zara', category: 'fashion' },
+  { name: 'Golf', category: 'fashion' },
+  { name: 'Bug', category: 'electronics' },
+  { name: 'KSP', category: 'electronics' },
+  { name: 'Ivory', category: 'electronics' },
+  { name: 'iDigital', category: 'electronics' },
+  { name: 'IKEA', category: 'home' },
+  { name: 'Ace', category: 'home' },
+  { name: 'Home Center', category: 'home' },
+  { name: 'Aroma', category: 'food' },
+  { name: 'Cafe Cafe', category: 'food' },
+  { name: 'McDonalds', category: 'food' },
+  { name: 'Shufersal', category: 'supermarket' },
+  { name: 'Rami Levy', category: 'supermarket' },
+  { name: 'Victory', category: 'supermarket' },
+  { name: 'Super-Pharm', category: 'beauty' },
+  { name: 'Be', category: 'beauty' },
+];
+
+const issuers: SeedIssuer[] = [
   {
     name: 'BuyMe',
-    nameHe: 'ביי-מי',
+    websiteUrl: 'https://www.buyme.co.il',
     logoUrl: '/logos/buyme.png',
-    brandColor: '#FF6B35',
+    products: [
+      {
+        name: 'BuyMe Fashion',
+        description: 'Valid in fashion brands that participate in BuyMe.',
+        sourceUrl: 'https://www.buyme.co.il',
+        stores: [
+          { name: 'Castro' },
+          { name: 'Fox' },
+          { name: 'H&M' },
+          { name: 'Zara' },
+          { name: 'Golf' },
+        ],
+      },
+      {
+        name: 'BuyMe Tech',
+        description: 'Valid in electronics stores that participate in BuyMe.',
+        sourceUrl: 'https://www.buyme.co.il',
+        stores: [{ name: 'Bug' }, { name: 'KSP' }, { name: 'Ivory' }, { name: 'iDigital' }],
+      },
+      {
+        name: 'BuyMe Food',
+        description: 'Valid in restaurants/coffee chains that participate in BuyMe.',
+        sourceUrl: 'https://www.buyme.co.il',
+        stores: [{ name: 'Aroma' }, { name: 'Cafe Cafe' }, { name: 'McDonalds' }],
+      },
+    ],
   },
   {
     name: 'Max',
-    nameHe: 'מקס',
+    websiteUrl: 'https://www.max.co.il',
     logoUrl: '/logos/max.png',
-    brandColor: '#E31E24',
+    products: [
+      {
+        name: 'Max Gift Fashion',
+        sourceUrl: 'https://www.max.co.il',
+        stores: [{ name: 'Castro' }, { name: 'Fox' }, { name: 'Golf' }],
+      },
+      {
+        name: 'Max Gift Home',
+        sourceUrl: 'https://www.max.co.il',
+        stores: [{ name: 'Ace' }, { name: 'Home Center' }, { name: 'IKEA' }],
+      },
+    ],
   },
   {
     name: 'Dreamcard',
-    nameHe: 'דרימקארד',
+    websiteUrl: 'https://www.dreamcard.co.il',
     logoUrl: '/logos/dreamcard.png',
-    brandColor: '#7B2CBF',
-  },
-  {
-    name: 'Tav Tzahav',
-    nameHe: 'תו זהב',
-    logoUrl: '/logos/tav-tzahav.png',
-    brandColor: '#FFD700',
-  },
-  {
-    name: 'Other',
-    nameHe: 'אחר',
-    brandColor: '#6B7280',
+    products: [
+      {
+        name: 'Dreamcard Supermarket',
+        sourceUrl: 'https://www.dreamcard.co.il',
+        stores: [{ name: 'Shufersal' }, { name: 'Rami Levy' }, { name: 'Victory' }],
+      },
+      {
+        name: 'Dreamcard Beauty',
+        sourceUrl: 'https://www.dreamcard.co.il',
+        stores: [{ name: 'Super-Pharm' }, { name: 'Be' }],
+      },
+    ],
   },
 ];
-
-// Establishments that accept gift cards
-const establishments = [
-  { name: 'Castro', nameHe: 'קסטרו' },
-  { name: 'Fox', nameHe: 'פוקס' },
-  { name: 'H&M', nameHe: 'H&M' },
-  { name: 'Zara', nameHe: 'זארה' },
-  { name: 'Golf', nameHe: 'גולף' },
-  { name: 'Renuar', nameHe: 'רנואר' },
-  { name: 'Honigman', nameHe: 'הוניגמן' },
-  { name: 'American Eagle', nameHe: 'אמריקן איגל' },
-  { name: 'Pull & Bear', nameHe: 'פול אנד בר' },
-  { name: 'Massimo Dutti', nameHe: 'מסימו דוטי' },
-  { name: 'Bug', nameHe: 'באג' },
-  { name: 'KSP', nameHe: 'KSP' },
-  { name: 'iDigital', nameHe: 'איי-דיגיטל' },
-  { name: 'Ivory', nameHe: 'איבורי' },
-  { name: 'Office Depot', nameHe: 'אופיס דיפו' },
-  { name: 'IKEA', nameHe: 'איקאה' },
-  { name: 'Ace', nameHe: 'אייס' },
-  { name: 'Home Center', nameHe: 'הום סנטר' },
-  { name: 'Keter', nameHe: 'כתר' },
-  { name: 'Hamashbir', nameHe: 'המשביר' },
-  { name: 'Aroma', nameHe: 'ארומה' },
-  { name: 'Cafe Cafe', nameHe: 'קפה קפה' },
-  { name: 'Landwer', nameHe: 'לנדוור' },
-  { name: 'Greg', nameHe: 'גרג' },
-  { name: 'Arcaffe', nameHe: 'ארקפה' },
-  { name: 'McDonalds', nameHe: 'מקדונלדס' },
-  { name: 'BBB', nameHe: 'BBB' },
-  { name: 'Moses', nameHe: 'מוזס' },
-  { name: 'Shufersal', nameHe: 'שופרסל' },
-  { name: 'Rami Levy', nameHe: 'רמי לוי' },
-  { name: 'Victory', nameHe: 'ויקטורי' },
-  { name: 'Yochananof', nameHe: 'יוחננוף' },
-  { name: 'Super-Pharm', nameHe: 'סופר-פארם' },
-  { name: 'Be', nameHe: 'Be' },
-  { name: 'MAC', nameHe: 'מאק' },
-  { name: 'Kiehl\'s', nameHe: 'קיאלס' },
-  { name: 'L\'Occitane', nameHe: 'לאוקסיטן' },
-];
-
-// Mapping of which issuers work at which establishments
-// This is sample data - in reality this would come from issuer documentation
-const issuerEstablishmentMappings: Record<string, string[]> = {
-  'BuyMe': [
-    'Castro', 'Fox', 'H&M', 'Zara', 'Golf', 'Renuar', 'Honigman',
-    'Bug', 'KSP', 'iDigital', 'Ivory',
-    'IKEA', 'Ace', 'Home Center', 'Keter', 'Hamashbir',
-    'Aroma', 'Cafe Cafe', 'Landwer', 'Greg', 'Arcaffe', 'McDonalds', 'BBB', 'Moses',
-    'Super-Pharm', 'Be', 'MAC', 'Kiehl\'s', 'L\'Occitane',
-  ],
-  'Max': [
-    'Castro', 'Fox', 'Golf', 'Renuar', 'American Eagle', 'Pull & Bear', 'Massimo Dutti',
-    'Bug', 'KSP', 'Office Depot',
-    'Ace', 'Home Center',
-    'Aroma', 'Cafe Cafe', 'Greg',
-    'Shufersal', 'Victory',
-    'Super-Pharm', 'Be',
-  ],
-  'Dreamcard': [
-    'H&M', 'Zara', 'American Eagle', 'Pull & Bear', 'Massimo Dutti',
-    'iDigital', 'Ivory',
-    'IKEA', 'Hamashbir',
-    'Landwer', 'Arcaffe', 'BBB', 'Moses',
-    'Rami Levy', 'Yochananof',
-    'MAC', 'Kiehl\'s', 'L\'Occitane',
-  ],
-  'Tav Tzahav': [
-    'Castro', 'Fox', 'H&M', 'Golf', 'Honigman',
-    'Bug', 'KSP',
-    'Ace', 'Home Center', 'Keter',
-    'Aroma', 'Cafe Cafe', 'Landwer', 'McDonalds',
-    'Shufersal', 'Rami Levy', 'Victory', 'Yochananof',
-    'Super-Pharm',
-  ],
-};
 
 async function main() {
-  console.log('🌱 Seeding database...');
+  console.log('🌱 Seeding database (Issuer/CardProduct/Store)...');
 
-  // Create issuers
-  const issuerMap: Record<string, string> = {};
-  for (const issuer of issuers) {
-    const existing = await prisma.issuer.findFirst({
-      where: { name: issuer.name },
-    });
-
-    if (existing) {
-      console.log(`⏭️  Issuer ${issuer.name} already exists, skipping...`);
-      issuerMap[issuer.name] = existing.id;
-      continue;
-    }
-
-    const created = await prisma.issuer.create({
-      data: issuer,
-    });
-    issuerMap[issuer.name] = created.id;
-    console.log(`✅ Created issuer: ${issuer.name}`);
+  // Stores
+  const storeIdByName = new Map<string, string>();
+  for (const s of storesCatalog) {
+    const existing = await prisma.store.findFirst({ where: { name: s.name } });
+    const store = existing
+      ? existing
+      : await prisma.store.create({
+          data: {
+            name: s.name,
+            category: s.category,
+            websiteUrl: s.websiteUrl,
+          },
+        });
+    storeIdByName.set(store.name, store.id);
   }
+  console.log(`✅ Stores ready: ${storeIdByName.size}`);
 
-  // Create establishments
-  const establishmentMap: Record<string, string> = {};
-  for (const establishment of establishments) {
-    const existing = await prisma.establishment.findFirst({
-      where: { name: establishment.name },
-    });
-
-    if (existing) {
-      console.log(`⏭️  Establishment ${establishment.name} already exists, skipping...`);
-      establishmentMap[establishment.name] = existing.id;
-      continue;
-    }
-
-    const created = await prisma.establishment.create({
-      data: establishment,
-    });
-    establishmentMap[establishment.name] = created.id;
-    console.log(`✅ Created establishment: ${establishment.name}`);
-  }
-
-  // Create issuer-establishment relationships
-  for (const [issuerName, establishmentNames] of Object.entries(issuerEstablishmentMappings)) {
-    const issuerId = issuerMap[issuerName];
-    if (!issuerId) {
-      console.log(`⚠️  Issuer ${issuerName} not found, skipping mappings...`);
-      continue;
-    }
-
-    for (const establishmentName of establishmentNames) {
-      const establishmentId = establishmentMap[establishmentName];
-      if (!establishmentId) {
-        console.log(`⚠️  Establishment ${establishmentName} not found, skipping...`);
-        continue;
-      }
-
-      const existing = await prisma.issuerEstablishment.findFirst({
-        where: {
-          issuerId,
-          establishmentId,
-        },
-      });
-
-      if (existing) {
-        continue; // Already exists
-      }
-
-      await prisma.issuerEstablishment.create({
+  // Issuers + CardProducts + join table
+  for (const issuerSeed of issuers) {
+    const issuer =
+      (await prisma.issuer.findFirst({ where: { name: issuerSeed.name } })) ||
+      (await prisma.issuer.create({
         data: {
-          issuerId,
-          establishmentId,
+          name: issuerSeed.name,
+          websiteUrl: issuerSeed.websiteUrl,
+          logoUrl: issuerSeed.logoUrl,
         },
-      });
+      }));
+
+    for (const productSeed of issuerSeed.products) {
+      const cardProduct =
+        (await prisma.cardProduct.findFirst({
+          where: { issuerId: issuer.id, name: productSeed.name },
+        })) ||
+        (await prisma.cardProduct.create({
+          data: {
+            issuerId: issuer.id,
+            name: productSeed.name,
+            description: productSeed.description,
+            sourceUrl: productSeed.sourceUrl,
+            lastVerifiedAt: new Date(),
+          },
+        }));
+
+      for (const storeRef of productSeed.stores) {
+        const storeId = storeIdByName.get(storeRef.name);
+        if (!storeId) continue;
+
+        await prisma.cardProductStore.upsert({
+          where: { cardProductId_storeId: { cardProductId: cardProduct.id, storeId } },
+          update: { type: storeRef.type ?? StoreAccessType.both },
+          create: { cardProductId: cardProduct.id, storeId, type: storeRef.type ?? StoreAccessType.both },
+        });
+      }
     }
-    console.log(`✅ Created mappings for issuer: ${issuerName}`);
   }
 
-  console.log('✅ Seeding complete!');
+  console.log('✅ Seed complete');
 }
 
 main()
