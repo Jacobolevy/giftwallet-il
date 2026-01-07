@@ -50,7 +50,10 @@ export default function WalletPage() {
         cardsAPI.getStats(),
       ]);
 
-      setCards(cardsRes.data);
+      // Backend returns { cards: [...], pagination, summary } - extract the array
+      const cardsData = cardsRes.data;
+      const cardsArray = Array.isArray(cardsData) ? cardsData : (cardsData?.cards ?? []);
+      setCards(cardsArray);
       setStats(statsRes.data);
     } catch (error: any) {
       toast.error(error.response?.data?.error?.message || t('common_error'));
@@ -199,4 +202,3 @@ export default function WalletPage() {
     </AppLayout>
   );
 }
-

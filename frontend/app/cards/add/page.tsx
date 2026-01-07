@@ -44,8 +44,9 @@ export default function AddCardPage() {
   const loadIssuers = async () => {
     try {
       const response = await issuersAPI.getAll();
-
-      setIssuers(response.data);
+      // Defensive: ensure we always get an array
+      const issuersArray = Array.isArray(response.data) ? response.data : [];
+      setIssuers(issuersArray);
     } catch (error: any) {
       toast.error(error.response?.data?.error?.message || t('common_error'));
     }
@@ -324,4 +325,3 @@ export default function AddCardPage() {
     </AppLayout>
   );
 }
-
