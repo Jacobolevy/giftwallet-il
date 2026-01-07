@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { signup as signupService, login as loginService } from '../services/authService';
+import { signup as signupService, login as loginService, devLogin as devLoginService } from '../services/authService';
 import { sendSuccess, sendError } from '../utils/response';
 import { ApiError } from '../middleware/errorHandler';
 
@@ -94,5 +94,36 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     sendSuccess(res, null, 200, 'Password reset successfully');
   } catch (error: any) {
     sendError(res, 'VALIDATION_ERROR', error.message || 'Invalid or expired token', 400);
+  }
+};
+
+export const devLogin = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Hard guard: never allow this in production
+    if (process.env.NODE_ENV === 'production') {
+      sendError(res, 'NOT_FOUND', 'Not found', 404);
+      return;
+    }
+
+    // Optional flag to explicitly enable in dev/test
+    if (process.env.ENABLE_DEV_LOGIN !== 'true') {
+      sendError(res, 'FORBIDDEN', 'Dev login is disabled', 403);
+      return;
+    }
+
+    const { email, name, language_preference } = req.body || {};
+    const result = await devLoginService({
+      email,
+      name,
+      languagePreference: language_preference,
+    });
+
+    sendSuccess(res, {
+      user: result.user,
+      token: result.token,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+  } catch (error: any) {
+    sendError(res, 'INTERNAL_ERROR', error.message || 'Dev login failed', 500);
   }
 };

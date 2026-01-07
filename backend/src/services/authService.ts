@@ -17,6 +17,12 @@ export interface LoginData {
   password: string;
 }
 
+export interface DevLoginData {
+  email?: string;
+  name?: string;
+  languagePreference?: Language;
+}
+
 export const signup = async (data: SignupData) => {
   const { email, password, name, phone, languagePreference = Language.he } = data;
 
@@ -94,6 +100,49 @@ export const login = async (data: LoginData) => {
       name: user.name,
       phone: user.phone,
       languagePreference: user.languagePreference,
+    },
+    token,
+  };
+};
+
+/**
+ * DEV-only helper to obtain a valid JWT without knowing credentials.
+ * Guard usage at the routing/controller level (never enable in production).
+ */
+export const devLogin = async (data: DevLoginData = {}) => {
+  const email = (data.email || process.env.DEV_DEMO_EMAIL || 'demo@giftwallet.local').toLowerCase();
+  const name = data.name || 'Demo User';
+  const languagePreference = data.languagePreference || Language.he;
+
+  // Ensure demo user exists (password is irrelevant; endpoint bypasses password checks)
+  const existing = await prisma.user.findUnique({ where: { email } });
+  const userRecord = existing
+    ? await prisma.user.update({
+        where: { id: existing.id },
+        data: { name, languagePreference },
+      })
+    : await prisma.user.create({
+        data: {
+          email,
+          passwordHash: await bcrypt.hash(process.env.DEV_DEMO_PASSWORD || 'demo-password-not-used', 12),
+          name,
+          languagePreference,
+        },
+      });
+
+  const token = jwt.sign(
+    { userId: userRecord.id },
+    process.env.JWT_SECRET!,
+    { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'] }
+  );
+
+  return {
+    user: {
+      id: userRecord.id,
+      email: userRecord.email,
+      name: userRecord.name,
+      phone: userRecord.phone,
+      languagePreference: userRecord.languagePreference,
     },
     token,
   };

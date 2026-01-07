@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const lang: 'he' | 'en' = 'he'; // TODO: Get from user preference
 
@@ -26,7 +27,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await authAPI.login({ email, password });
+      const response = await authAPI.login({ email, password, remember_me: remember });
       const { user, token } = response.data;
 
       setAuth(user, token);
@@ -38,10 +39,46 @@ export default function LoginPage() {
       toast.success(t('common_success'));
       router.push('/wallet');
     } catch (error: any) {
-      const errorMessage = error.response?.data?.error?.message || error.response?.data?.error || t('common_error');
+      if (!error?.response) {
+        // Most common on Render free tier when backend is waking up / temporarily unavailable
+        toast.error('Server is unavailable. Please wait ~30 seconds and try again.');
+        return;
+      }
+
+      const details = error.response?.data?.error?.details;
+      const detailMessage =
+        details && typeof details === 'object'
+          ? (Object.values(details)[0] as string | undefined)
+          : undefined;
+
+      const errorMessage =
+        detailMessage ||
+        error.response?.data?.error?.message ||
+        error.response?.data?.message ||
+        t('common_error');
+
       toast.error(typeof errorMessage === 'string' ? errorMessage : t('common_error'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const canUseDevLogin =
+    process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === 'true';
+
+  const handleDemoLogin = async () => {
+    setDemoLoading(true);
+    try {
+      const response = await authAPI.devLogin();
+      const { user, token } = response.data;
+      setAuth(user, token);
+      toast.success(t('common_success'));
+      router.push('/wallet');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.error || t('common_error');
+      toast.error(typeof errorMessage === 'string' ? errorMessage : t('common_error'));
+    } finally {
+      setDemoLoading(false);
     }
   };
 
@@ -117,6 +154,17 @@ export default function LoginPage() {
             >
               {loading ? t('common_loading') : t('auth_login')}
             </button>
+
+            {canUseDevLogin && (
+              <button
+                type="button"
+                disabled={demoLoading}
+                onClick={handleDemoLogin}
+                className="w-full bg-gray-900 text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {demoLoading ? t('common_loading') : 'Entrar como demo'}
+              </button>
+            )}
           </form>
 
           <div className="mt-6 text-center">

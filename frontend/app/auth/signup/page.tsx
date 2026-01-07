@@ -77,7 +77,23 @@ export default function SignupPage() {
       toast.success(t('common_success'));
       router.push('/wallet');
     } catch (error: any) {
-      const errorMessage = error.response?.data?.error?.message || error.response?.data?.error || t('common_error');
+      if (!error?.response) {
+        toast.error('Server is unavailable. Please wait ~30 seconds and try again.');
+        return;
+      }
+
+      const details = error.response?.data?.error?.details;
+      const detailMessage =
+        details && typeof details === 'object'
+          ? (Object.values(details)[0] as string | undefined)
+          : undefined;
+
+      const errorMessage =
+        detailMessage ||
+        error.response?.data?.error?.message ||
+        error.response?.data?.message ||
+        t('common_error');
+
       toast.error(typeof errorMessage === 'string' ? errorMessage : t('common_error'));
     } finally {
       setLoading(false);
