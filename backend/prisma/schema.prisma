@@ -1,0 +1,132 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Language {
+  he
+  en
+}
+
+enum CardStatus {
+  active
+  used
+  expired
+}
+
+enum ReminderType {
+  thirty_days_before
+  seven_days_before
+  three_days_before
+  one_day_before
+}
+
+enum ChangeType {
+  manual_update
+  purchase
+  refund
+  correction
+}
+
+model User {
+  id                        String   @id @default(uuid())
+  email                     String   @unique
+  passwordHash              String   @map("password_hash")
+  phone                     String?
+  name                      String?
+  languagePreference        Language @default(he) @map("language_preference")
+  emailNotificationsEnabled Boolean  @default(true) @map("email_notifications_enabled")
+  pushNotificationsEnabled  Boolean  @default(true) @map("push_notifications_enabled")
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  giftCards GiftCard[]
+  reminders Reminder[]
+
+  @@map("users")
+}
+
+model Issuer {
+  id              String   @id @default(uuid())
+  name            String
+  nameHe          String?  @map("name_he")
+  websiteUrl      String?  @map("website_url")
+  logoUrl         String?  @map("logo_url")
+  brandColor      String?  @map("brand_color")
+  supportPhone    String?  @map("support_phone")
+  supportEmail    String?  @map("support_email")
+  notes           String?  @db.Text
+  apiEndpoint     String?  @map("api_endpoint")
+  balanceCheckUrl String?  @map("balance_check_url")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  giftCards GiftCard[]
+
+  @@map("issuers")
+}
+
+model GiftCard {
+  id                String     @id @default(uuid())
+  userId            String     @map("user_id")
+  issuerId          String     @map("issuer_id")
+  label             String
+  labelHe           String?    @map("label_he")
+  codeLast4         String     @map("code_last4") @db.VarChar(4)
+  fullCode          String?    @map("full_code") // Encrypted
+  valueInitial      Decimal    @map("value_initial") @db.Decimal(10, 2)
+  valueCurrent      Decimal    @map("value_current") @db.Decimal(10, 2)
+  currency          String     @default("ILS")
+  expiryDate        DateTime   @map("expiry_date") @db.Date
+  status            CardStatus @default(active)
+  notes             String?    @db.Text
+  photoUrl          String?    @map("photo_url")
+  lastBalanceUpdate DateTime?  @map("last_balance_update")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  issuer          Issuer          @relation(fields: [issuerId], references: [id])
+  reminders       Reminder[]
+  balanceHistory  BalanceHistory[]
+
+  @@map("gift_cards")
+}
+
+model Reminder {
+  id          String       @id @default(uuid())
+  userId      String       @map("user_id")
+  giftcardId  String       @map("giftcard_id")
+  reminderDate DateTime    @map("reminder_date") @db.Date
+  type        ReminderType
+  sentFlag    Boolean      @default(false) @map("sent_flag")
+  sentAt      DateTime?    @map("sent_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  giftCard GiftCard  @relation(fields: [giftcardId], references: [id], onDelete: Cascade)
+
+  @@map("reminders")
+}
+
+model BalanceHistory {
+  id             String     @id @default(uuid())
+  giftcardId     String     @map("giftcard_id")
+  previousBalance Decimal   @map("previous_balance") @db.Decimal(10, 2)
+  newBalance     Decimal    @map("new_balance") @db.Decimal(10, 2)
+  changeAmount   Decimal    @map("change_amount") @db.Decimal(10, 2)
+  changeType     ChangeType @map("change_type")
+  notes          String?
+  createdAt      DateTime   @default(now()) @map("created_at")
+
+  giftCard GiftCard @relation(fields: [giftcardId], references: [id], onDelete: Cascade)
+
+  @@map("balance_history")
+}
+
