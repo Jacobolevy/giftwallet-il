@@ -58,6 +58,7 @@ model CardProduct {
   stores CardProductStore[]
   cards  UserCard[]
 
+  @@unique([issuerId, name], map: "card_products_issuer_id_name_key")
   @@map("card_products")
 }
 
