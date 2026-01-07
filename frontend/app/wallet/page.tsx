@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { authAPI, cardsAPI } from '@/lib/api';
 import { getTranslation } from '@/lib/translations';
@@ -30,16 +30,12 @@ interface Card {
 export default function WalletPage() {
   const { user } = useAuthStore();
   const lang = user?.languagePreference || 'he';
-  const t = (key: any) => getTranslation(lang, key);
+  const t = useCallback((key: any) => getTranslation(lang, key), [lang]);
 
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const cardsRes = await cardsAPI.getAll();
       const cardsData = cardsRes.data;
@@ -50,7 +46,11 @@ export default function WalletPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleLogout = async () => {
     try {

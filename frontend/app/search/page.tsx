@@ -1,17 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { establishmentsAPI } from '@/lib/api';
 import { getTranslation } from '@/lib/translations';
 import { useAuthStore } from '@/lib/store';
 import { useDebounce } from '@/lib/hooks';
+import toast from 'react-hot-toast';
 import { 
   Search, 
   MapPin, 
   ChevronRight, 
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface Card {
   id: string;
@@ -49,34 +51,25 @@ export default function SearchPage() {
     loadRecentSearches();
   }, []);
 
-  useEffect(() => {
-    if (debouncedQuery.length >= 2) {
-      searchEstablishments(debouncedQuery);
-    } else if (debouncedQuery.length === 0 && hasSearched) {
-      setResults([]);
-      setHasSearched(false);
-    }
-  }, [debouncedQuery]);
-
-  const loadRecentSearches = () => {
+  const loadRecentSearches = useCallback(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('recentSearches');
       if (saved) {
         setRecentSearches(JSON.parse(saved));
       }
     }
-  };
+  }, []);
 
-  const saveRecentSearch = (searchTerm: string) => {
+  const saveRecentSearch = useCallback((searchTerm: string) => {
     if (searchTerm.length < 2) return;
-    const updated = [searchTerm, ...recentSearches.filter(s => s !== searchTerm)].slice(0, 5);
+    const updated = [searchTerm, ...recentSearches.filter((s) => s !== searchTerm)].slice(0, 5);
     setRecentSearches(updated);
     if (typeof window !== 'undefined') {
       localStorage.setItem('recentSearches', JSON.stringify(updated));
     }
-  };
+  }, [recentSearches]);
 
-  const searchEstablishments = async (searchQuery: string) => {
+  const searchEstablishments = useCallback(async (searchQuery: string) => {
     setLoading(true);
     try {
       const response = await establishmentsAPI.search(searchQuery || undefined);
@@ -86,11 +79,20 @@ export default function SearchPage() {
         saveRecentSearch(searchQuery);
       }
     } catch (error) {
-      console.error('Search error:', error);
+      toast.error(t('common_error'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [saveRecentSearch, t]);
+
+  useEffect(() => {
+    if (debouncedQuery.length >= 2) {
+      searchEstablishments(debouncedQuery);
+    } else if (debouncedQuery.length === 0 && hasSearched) {
+      setResults([]);
+      setHasSearched(false);
+    }
+  }, [debouncedQuery, hasSearched, searchEstablishments]);
 
   const handleRecentSearchClick = (search: string) => {
     setQuery(search);
@@ -153,7 +155,7 @@ export default function SearchPage() {
             {results.length > 0 && (
               <div className="space-y-3">
                 {results.map((establishment) => (
-                  <EstablishmentCard key={establishment.id} establishment={establishment} lang={lang} />
+                  <EstablishmentCard key={establishment.id} establishment={establishment} />
                 ))}
               </div>
             )}
@@ -183,10 +185,8 @@ export default function SearchPage() {
 // Establishment Card Component
 function EstablishmentCard({
   establishment,
-  lang,
 }: {
   establishment: StoreResult;
-  lang: string;
 }) {
   const name = establishment.name;
   const total = establishment.totalAmount || 0;
@@ -200,9 +200,12 @@ function EstablishmentCard({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {establishment.logoUrl ? (
-            <img
+            <Image
               src={establishment.logoUrl}
               alt={name}
+              width={48}
+              height={48}
+              unoptimized
               className="w-12 h-12 rounded-lg object-contain bg-gray-50"
             />
           ) : (

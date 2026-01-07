@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { signup as signupService, login as loginService } from '../services/authService';
+import { signup as signupService, login as loginService, devLogin as devLoginService } from '../services/authService';
 import { sendSuccess, sendError } from '../utils/response';
 
 export const signup = async (req: Request, res: Response): Promise<void> => {
@@ -51,4 +51,23 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
 export const logout = async (req: Request, res: Response): Promise<void> => {
   sendSuccess(res, null, 200, 'Logged out successfully');
+};
+
+export const devLogin = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    if (process.env.NODE_ENV === 'production') {
+      // Do not expose this endpoint in production.
+      sendError(res, 'NOT_FOUND', 'Not found', 404);
+      return;
+    }
+
+    const result = await devLoginService();
+    sendSuccess(res, {
+      user: result.user,
+      token: result.token,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+  } catch (error: any) {
+    sendError(res, 'INTERNAL_ERROR', error.message || 'Unable to dev login', 500);
+  }
 };

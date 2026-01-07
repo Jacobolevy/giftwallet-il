@@ -70,6 +70,7 @@ export const authAPI = {
     api.post('/auth/signup', data),
   login: (data: { email: string; password: string; remember_me?: boolean }) =>
     api.post('/auth/login', data),
+  devLogin: () => api.post('/auth/dev-login'),
   logout: () =>
     api.post('/auth/logout'),
 };

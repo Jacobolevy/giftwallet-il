@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import AppLayout from '@/components/layout/AppLayout';
 import { establishmentsAPI } from '@/lib/api';
@@ -11,8 +11,7 @@ import Link from 'next/link';
 import { 
   ArrowLeft, 
   MapPin, 
-  CreditCard, 
-  ExternalLink
+  CreditCard
 } from 'lucide-react';
 
 interface Card {
@@ -49,16 +48,12 @@ export default function EstablishmentDetailPage() {
   const establishmentId = params.id as string;
   const { user } = useAuthStore();
   const lang = user?.languagePreference || 'he';
-  const t = (key: any) => getTranslation(lang, key);
+  const t = useCallback((key: any) => getTranslation(lang, key), [lang]);
 
   const [data, setData] = useState<MyCardsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, [establishmentId]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const response = await establishmentsAPI.getMyCards(establishmentId);
       setData(response.data);
@@ -68,7 +63,11 @@ export default function EstablishmentDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [establishmentId, router, t]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   if (loading) {
     return (

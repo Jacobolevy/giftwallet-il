@@ -99,3 +99,44 @@ export const login = async (data: LoginData) => {
   };
 };
 
+/**
+ * Dev-only helper for local testing/demo UI.
+ * Creates a deterministic demo user if missing and returns a valid JWT.
+ */
+export const devLogin = async () => {
+  const demoEmail = process.env.DEV_LOGIN_EMAIL || 'demo@giftwallet.local';
+  const demoPassword = process.env.DEV_LOGIN_PASSWORD || 'demo-password-change-me';
+
+  const existingUser = await prisma.user.findUnique({
+    where: { email: demoEmail },
+  });
+
+  const userRecord =
+    existingUser ??
+    (await prisma.user.create({
+      data: {
+        email: demoEmail,
+        passwordHash: await bcrypt.hash(demoPassword, 12),
+        name: 'Demo User',
+        languagePreference: Language.he,
+      },
+    }));
+
+  const token = jwt.sign(
+    { userId: userRecord.id },
+    process.env.JWT_SECRET!,
+    { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'] }
+  );
+
+  return {
+    user: {
+      id: userRecord.id,
+      email: userRecord.email,
+      name: userRecord.name,
+      phone: userRecord.phone,
+      languagePreference: userRecord.languagePreference,
+    },
+    token,
+  };
+};
+

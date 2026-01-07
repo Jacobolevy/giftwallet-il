@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { signup, login, logout } from '../controllers/authController';
+import { signup, login, logout, devLogin } from '../controllers/authController';
 import { validateSignup, validateLogin } from '../utils/validation';
 import { validationResult } from 'express-validator';
 import { authRateLimiter, signupRateLimiter } from '../middleware/rateLimiter';
@@ -27,6 +27,7 @@ const handleValidationErrors = (req: any, res: any, next: any) => {
 
 router.post('/signup', signupRateLimiter, validateSignup, handleValidationErrors, signup);
 router.post('/login', authRateLimiter, validateLogin, handleValidationErrors, login);
+router.post('/dev-login', authRateLimiter, devLogin);
 router.post('/logout', authenticate, logout);
 
 export default router;

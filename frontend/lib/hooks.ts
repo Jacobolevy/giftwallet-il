@@ -20,7 +20,7 @@ export function useDebounce<T>(value: T, delay: number): T {
 /**
  * Debounce a callback function
  */
-export function useDebouncedCallback<T extends (...args: any[]) => any>(
+export function useDebouncedCallback<T extends (..._args: any[]) => any>(
   callback: T,
   delay: number
 ): T {
@@ -58,7 +58,7 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
 export function useLocalStorage<T>(
   key: string,
   initialValue: T
-): [T, (value: T | ((val: T) => T)) => void] {
+): [T, (value: T | ((prev: T) => T)) => void] {
   const [storedValue, setStoredValue] = useState<T>(() => {
     if (typeof window === 'undefined') {
       return initialValue;
@@ -67,12 +67,11 @@ export function useLocalStorage<T>(
       const item = window.localStorage.getItem(key);
       return item ? JSON.parse(item) : initialValue;
     } catch (error) {
-      console.error(error);
       return initialValue;
     }
   });
 
-  const setValue = (value: T | ((val: T) => T)) => {
+  const setValue = (value: T | ((prev: T) => T)) => {
     try {
       const valueToStore =
         value instanceof Function ? value(storedValue) : value;
@@ -81,7 +80,7 @@ export function useLocalStorage<T>(
         window.localStorage.setItem(key, JSON.stringify(valueToStore));
       }
     } catch (error) {
-      console.error(error);
+      // ignore storage errors (quota exceeded, privacy mode, etc.)
     }
   };
 
