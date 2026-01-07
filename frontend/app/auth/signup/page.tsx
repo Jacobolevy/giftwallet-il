@@ -54,7 +54,8 @@ export default function SignupPage() {
       toast.success(t('common_success'));
       router.push('/wallet');
     } catch (error: any) {
-      toast.error(error.response?.data?.error || t('common_error'));
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.error || t('common_error');
+      toast.error(typeof errorMessage === 'string' ? errorMessage : t('common_error'));
     } finally {
       setLoading(false);
     }

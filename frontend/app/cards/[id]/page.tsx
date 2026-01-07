@@ -31,7 +31,7 @@ export default function CardDetailsPage() {
       const response = await cardsAPI.getById(cardId);
       setCard(response.data);
     } catch (error: any) {
-      toast.error(error.response?.data?.error || t('common_error'));
+      toast.error(error.response?.data?.error?.message || t('common_error'));
       router.push('/wallet');
     } finally {
       setLoading(false);
@@ -46,7 +46,7 @@ export default function CardDetailsPage() {
       toast.success('Card deleted');
       router.push('/wallet');
     } catch (error: any) {
-      toast.error(error.response?.data?.error || t('common_error'));
+      toast.error(error.response?.data?.error?.message || t('common_error'));
     }
   };
 
@@ -58,7 +58,7 @@ export default function CardDetailsPage() {
       toast.success('Card marked as used');
       loadCard();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || t('common_error'));
+      toast.error(error.response?.data?.error?.message || t('common_error'));
     }
   };
 
@@ -68,7 +68,7 @@ export default function CardDetailsPage() {
       await navigator.clipboard.writeText(response.data.fullCode);
       toast.success('Code copied to clipboard');
     } catch (error: any) {
-      toast.error(error.response?.data?.error || t('common_error'));
+      toast.error(error.response?.data?.error?.message || t('common_error'));
     }
   };
 

@@ -53,7 +53,7 @@ export default function WalletPage() {
       setCards(cardsRes.data);
       setStats(statsRes.data);
     } catch (error: any) {
-      toast.error(error.response?.data?.error || t('common_error'));
+      toast.error(error.response?.data?.error?.message || t('common_error'));
     } finally {
       setLoading(false);
     }

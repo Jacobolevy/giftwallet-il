@@ -46,7 +46,7 @@ export default function AddCardPage() {
       const response = await issuersAPI.getAll();
       setIssuers(response.data);
     } catch (error: any) {
-      toast.error(error.response?.data?.error || t('common_error'));
+      toast.error(error.response?.data?.error?.message || t('common_error'));
     }
   };
 
@@ -73,7 +73,7 @@ export default function AddCardPage() {
       toast.success(t('common_success'));
       router.push('/wallet');
     } catch (error: any) {
-      toast.error(error.response?.data?.error || t('common_error'));
+      toast.error(error.response?.data?.error?.message || t('common_error'));
     } finally {
       setLoading(false);
     }
