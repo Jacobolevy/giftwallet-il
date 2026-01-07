@@ -11,17 +11,19 @@ import { Plus, LogOut } from 'lucide-react';
 
 interface Card {
   id: string;
-  label: string;
-  labelHe?: string;
   codeLast4: string;
-  valueCurrent: number;
-  valueInitial: number;
+  balance: number;
+  expiresAt?: string | null;
   status: string;
-  issuer: {
+  nickname?: string | null;
+  cardProduct: {
+    id: string;
     name: string;
-    nameHe?: string;
-    brandColor?: string;
-    logoUrl?: string;
+    issuer: {
+      id: string;
+      name: string;
+      logoUrl?: string | null;
+    };
   };
 }
 
@@ -104,18 +106,16 @@ export default function WalletPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {cards.map((card) => {
-              const cardLabel = lang === 'he' && card.labelHe ? card.labelHe : card.label;
-              const issuerName = lang === 'he' && card.issuer.nameHe ? card.issuer.nameHe : card.issuer.name;
-              const progress = (Number(card.valueCurrent) / Number(card.valueInitial)) * 100;
+              const cardLabel = card.nickname || card.cardProduct.name;
+              const issuerName = card.cardProduct.issuer.name;
+              const progress = 100;
 
               return (
                 <Link
                   key={card.id}
                   href={`/cards/${card.id}`}
                   className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow"
-                  style={{
-                    borderTop: `4px solid ${card.issuer.brandColor || '#6B7280'}`,
-                  }}
+                  style={{ borderTop: `4px solid #6B7280` }}
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div>
@@ -129,7 +129,7 @@ export default function WalletPage() {
 
                   <div className="mb-4">
                     <p className="text-2xl font-bold text-gray-900">
-                      ₪{Number(card.valueCurrent).toFixed(0)}
+                      ₪{Number(card.balance).toFixed(0)}
                     </p>
                     <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
                       <div

@@ -96,9 +96,7 @@ export const issuersAPI = {
 
 // Establishments API
 export const establishmentsAPI = {
-  search: (search?: string) => api.get('/establishments', { params: { search } }),
-  getById: (id: string) =>
-    api.get(`/establishments/${id}`),
+  search: (q?: string) => api.get('/establishments/search', { params: { q } }),
   getMyCards: (id: string) =>
     api.get(`/establishments/${id}/my-cards`),
 };

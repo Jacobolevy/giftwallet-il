@@ -13,10 +13,9 @@ import { MapPin, ChevronRight } from 'lucide-react';
 interface Establishment {
   id: string;
   name: string;
-  nameHe?: string;
-  logoUrl?: string;
   category?: string;
-  notes?: string;
+  websiteUrl?: string;
+  type?: string;
 }
 
 export default function CardDetailsPage() {
@@ -53,7 +52,7 @@ export default function CardDetailsPage() {
     setLoadingEstablishments(true);
     try {
       const response = await cardsAPI.getEstablishments(cardId);
-      setEstablishments(response.data.establishments || []);
+      setEstablishments(response.data.stores || []);
     } catch (error) {
       console.error('Failed to load establishments:', error);
     } finally {
@@ -107,9 +106,9 @@ export default function CardDetailsPage() {
 
   if (!card) return null;
 
-  const cardLabel = lang === 'he' && card.labelHe ? card.labelHe : card.label;
-  const issuerName = lang === 'he' && card.issuer.nameHe ? card.issuer.nameHe : card.issuer.name;
-  const progress = (Number(card.valueCurrent) / Number(card.valueInitial)) * 100;
+  const cardLabel = card.nickname || card.cardProduct?.name || 'Card';
+  const issuerName = card.cardProduct?.issuer?.name || '';
+  const progress = card.balance && card.balance > 0 ? 100 : 0;
 
   return (
     <AppLayout>
@@ -125,7 +124,7 @@ export default function CardDetailsPage() {
         >
           <h1 className="text-3xl font-bold mb-2">{cardLabel}</h1>
           <p className="text-lg opacity-90 mb-6">{issuerName}</p>
-          <div className="text-4xl font-bold mb-4">₪{Number(card.valueCurrent).toFixed(0)}</div>
+          <div className="text-4xl font-bold mb-4">₪{Number(card.balance).toFixed(0)}</div>
           <div className="w-full bg-white/20 rounded-full h-2">
             <div
               className="bg-white h-2 rounded-full"
@@ -159,7 +158,7 @@ export default function CardDetailsPage() {
               <p className="font-semibold">{issuerName}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Label</p>
+              <p className="text-sm text-gray-500">Card Product</p>
               <p className="font-semibold">{cardLabel}</p>
             </div>
             <div>
@@ -173,24 +172,13 @@ export default function CardDetailsPage() {
           </div>
         </div>
 
-        {/* Balance & Value */}
+        {/* Balance */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Balance & Value</h2>
+          <h2 className="text-xl font-semibold mb-4">Balance</h2>
           <div className="space-y-4">
             <div>
-              <p className="text-sm text-gray-500">Initial Value</p>
-              <p className="text-2xl font-bold">₪{Number(card.valueInitial).toFixed(0)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Current Value</p>
-              <p className="text-2xl font-bold">₪{Number(card.valueCurrent).toFixed(0)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Value Used</p>
-              <p className="font-semibold">
-                ₪{(Number(card.valueInitial) - Number(card.valueCurrent)).toFixed(0)} (
-                {((1 - Number(card.valueCurrent) / Number(card.valueInitial)) * 100).toFixed(0)}%)
-              </p>
+              <p className="text-sm text-gray-500">Available</p>
+              <p className="text-2xl font-bold">₪{Number(card.balance).toFixed(0)}</p>
             </div>
           </div>
         </div>
@@ -209,7 +197,7 @@ export default function CardDetailsPage() {
           ) : establishments.length > 0 ? (
             <div className="space-y-2">
               {establishments.slice(0, 5).map((establishment) => {
-                const estName = lang === 'he' && establishment.nameHe ? establishment.nameHe : establishment.name;
+                const estName = establishment.name;
                 return (
                   <Link
                     key={establishment.id}
@@ -217,23 +205,10 @@ export default function CardDetailsPage() {
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      {establishment.logoUrl ? (
-                        <img
-                          src={establishment.logoUrl}
-                          alt={estName}
-                          className="w-8 h-8 rounded object-contain bg-white"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center">
-                          <MapPin size={16} className="text-gray-400" />
-                        </div>
-                      )}
+                      <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center">
+                        <MapPin size={16} className="text-gray-400" />
+                      </div>
                       <span className="font-medium text-gray-900">{estName}</span>
-                      {establishment.notes && (
-                        <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">
-                          {establishment.notes}
-                        </span>
-                      )}
                     </div>
                     <ChevronRight size={18} className="text-gray-400" />
                   </Link>

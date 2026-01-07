@@ -15,22 +15,18 @@ import Link from 'next/link';
 
 interface Card {
   id: string;
-  label: string;
-  labelHe?: string;
-  valueCurrent: number;
-  issuer: {
+  nickname?: string;
+  balance: number;
+  cardProduct: {
     id: string;
     name: string;
-    nameHe?: string;
-    brandColor?: string;
-    logoUrl?: string;
+    issuer: { id: string; name: string; logoUrl?: string };
   };
 }
 
-interface EstablishmentResult {
+interface StoreResult {
   id: string;
   name: string;
-  nameHe?: string;
   logoUrl?: string;
   totalAmount: number;
   cards: Card[];
@@ -42,7 +38,7 @@ export default function SearchPage() {
   const t = (key: any) => getTranslation(lang, key);
 
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<EstablishmentResult[]>([]);
+  const [results, setResults] = useState<StoreResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -84,7 +80,7 @@ export default function SearchPage() {
     setLoading(true);
     try {
       const response = await establishmentsAPI.search(searchQuery || undefined);
-      setResults(response.data.establishments || []);
+      setResults(response.data.stores || []);
       setHasSearched(true);
       if (searchQuery && searchQuery.length >= 2) {
         saveRecentSearch(searchQuery);
@@ -189,10 +185,10 @@ function EstablishmentCard({
   establishment,
   lang,
 }: {
-  establishment: EstablishmentResult;
+  establishment: StoreResult;
   lang: string;
 }) {
-  const name = lang === 'he' && establishment.nameHe ? establishment.nameHe : establishment.name;
+  const name = establishment.name;
   const total = establishment.totalAmount || 0;
   const cardsCount = establishment.cards?.length || 0;
 

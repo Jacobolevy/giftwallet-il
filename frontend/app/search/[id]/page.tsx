@@ -17,27 +17,28 @@ import {
 
 interface Card {
   id: string;
-  label: string;
-  labelHe?: string;
-  valueCurrent: number;
-  issuer: {
+  nickname?: string;
+  balance: number;
+  cardProduct: {
     id: string;
     name: string;
-    nameHe?: string;
-    brandColor?: string;
-    logoUrl?: string;
+    issuer: {
+      id: string;
+      name: string;
+      logoUrl?: string;
+    };
   };
 }
 
-interface EstablishmentDetail {
+interface StoreDetail {
   id: string;
   name: string;
-  nameHe?: string;
-  logoUrl?: string;
+  category?: string;
+  websiteUrl?: string;
 }
 
 interface MyCardsResponse {
-  establishment: EstablishmentDetail;
+  store: StoreDetail;
   cards: Card[];
   totalAmount: number;
 }
@@ -81,8 +82,8 @@ export default function EstablishmentDetailPage() {
 
   if (!data) return null;
 
-  const { establishment, cards, totalAmount } = data;
-  const name = lang === 'he' && establishment.nameHe ? establishment.nameHe : establishment.name;
+  const { store, cards, totalAmount } = data;
+  const name = store.name;
 
   return (
     <AppLayout>
@@ -96,22 +97,15 @@ export default function EstablishmentDetailPage() {
           <span>{t('common_back')}</span>
         </button>
 
-        {/* Establishment Header */}
+        {/* Store Header */}
         <div className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-2xl p-6 text-white mb-6 shadow-lg">
           <div className="flex items-center gap-4 mb-4">
-            {establishment.logoUrl ? (
-              <img
-                src={establishment.logoUrl}
-                alt={name}
-                className="w-16 h-16 rounded-xl bg-white p-2 object-contain"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-xl bg-white/20 flex items-center justify-center">
-                <MapPin size={32} className="text-white" />
-              </div>
-            )}
+            <div className="w-16 h-16 rounded-xl bg-white/20 flex items-center justify-center">
+              <MapPin size={32} className="text-white" />
+            </div>
             <div>
               <h1 className="text-2xl font-bold">{name}</h1>
+              {store.category && <p className="text-white/80">{store.category}</p>}
             </div>
           </div>
 
@@ -140,24 +134,24 @@ export default function EstablishmentDetailPage() {
 
             <div className="space-y-3">
               {cards.map((card) => {
-                const cardLabel = lang === 'he' && card.labelHe ? card.labelHe : card.label;
-                const issuerName = lang === 'he' && card.issuer.nameHe ? card.issuer.nameHe : card.issuer.name;
+                const label = card.nickname || card.cardProduct.name;
+                const issuerName = card.cardProduct.issuer.name;
 
                 return (
                   <Link
                     key={card.id}
                     href={`/cards/${card.id}`}
                     className="block bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
-                    style={{ borderLeft: `4px solid ${card.issuer.brandColor || '#6B7280'}` }}
+                    style={{ borderLeft: `4px solid #6B7280` }}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-semibold text-gray-900">{cardLabel}</h3>
+                        <h3 className="font-semibold text-gray-900">{label}</h3>
                         <p className="text-sm text-gray-500">{issuerName}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-xl font-bold text-primary-600">
-                          ₪{card.valueCurrent.toFixed(0)}
+                          ₪{Number(card.balance).toFixed(0)}
                         </p>
                       </div>
                     </div>

@@ -11,8 +11,13 @@ import toast from 'react-hot-toast';
 interface Issuer {
   id: string;
   name: string;
-  nameHe?: string;
-  brandColor?: string;
+  websiteUrl?: string;
+  logoUrl?: string;
+  products: Array<{
+    id: string;
+    name: string;
+    description?: string;
+  }>;
 }
 
 export default function AddCardPage() {
@@ -26,14 +31,12 @@ export default function AddCardPage() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     issuerId: '',
-    label: '',
-    labelHe: '',
+    cardProductId: '',
+    nickname: '',
     codeLast4: '',
     fullCode: '',
-    valueInitial: '',
-    valueCurrent: '',
-    notes: '',
-    sameAsInitial: true,
+    balance: '',
+    expiresAt: '',
   });
 
   useEffect(() => {
@@ -57,16 +60,12 @@ export default function AddCardPage() {
 
     try {
       const data = {
-        issuerId: formData.issuerId,
-        label: formData.label,
-        labelHe: formData.labelHe || undefined,
+        cardProductId: formData.cardProductId,
+        nickname: formData.nickname || undefined,
         codeLast4: formData.codeLast4,
         fullCode: formData.fullCode || undefined,
-        valueInitial: parseFloat(formData.valueInitial),
-        valueCurrent: formData.sameAsInitial
-          ? parseFloat(formData.valueInitial)
-          : parseFloat(formData.valueCurrent),
-        notes: formData.notes || undefined,
+        balance: formData.balance ? parseFloat(formData.balance) : undefined,
+        expiresAt: formData.expiresAt || undefined,
       };
 
       await cardsAPI.create(data);
@@ -80,6 +79,7 @@ export default function AddCardPage() {
   };
 
   const selectedIssuer = issuers.find((i) => i.id === formData.issuerId);
+  const selectedProduct = selectedIssuer?.products.find((p) => p.id === formData.cardProductId);
 
   return (
     <AppLayout>
@@ -116,21 +116,15 @@ export default function AddCardPage() {
                     <button
                       key={issuer.id}
                       type="button"
-                      onClick={() => setFormData({ ...formData, issuerId: issuer.id })}
+                      onClick={() => setFormData({ ...formData, issuerId: issuer.id, cardProductId: '' })}
                       className={`p-4 rounded-lg border-2 transition-all ${
                         formData.issuerId === issuer.id
                           ? 'border-primary-600 bg-primary-50'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
-                      style={{
-                        borderColor:
-                          formData.issuerId === issuer.id
-                            ? issuer.brandColor || '#2563eb'
-                            : undefined,
-                      }}
                     >
                       <p className="font-semibold">
-                        {lang === 'he' && issuer.nameHe ? issuer.nameHe : issuer.name}
+                        {issuer.name}
                       </p>
                     </button>
                   ))}
@@ -139,16 +133,40 @@ export default function AddCardPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('add_card_label')} *
+                  Card Product *
+                </label>
+                <select
+                  value={formData.cardProductId}
+                  onChange={(e) => setFormData({ ...formData, cardProductId: e.target.value })}
+                  required
+                  disabled={!selectedIssuer}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100"
+                >
+                  <option value="" disabled>
+                    {selectedIssuer ? 'Select a Card Product' : 'Select an Issuer first'}
+                  </option>
+                  {(selectedIssuer?.products || []).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedProduct?.description && (
+                  <p className="text-sm text-gray-500 mt-2">{selectedProduct.description}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nickname (optional)
                 </label>
                 <input
                   type="text"
-                  value={formData.label}
-                  onChange={(e) => setFormData({ ...formData, label: e.target.value })}
-                  required
-                  maxLength={50}
+                  value={formData.nickname}
+                  onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
+                  maxLength={100}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder={t('add_card_label_placeholder')}
+                  placeholder="e.g. Work gift, Mom's card"
                 />
               </div>
 
@@ -215,7 +233,7 @@ export default function AddCardPage() {
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                disabled={!formData.issuerId || !formData.label || !formData.codeLast4}
+                disabled={!formData.issuerId || !formData.cardProductId || !formData.codeLast4}
                 className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t('add_card_next')}
@@ -227,14 +245,14 @@ export default function AddCardPage() {
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('add_card_value_initial')} (₪) *
+                  Balance (₪) *
                 </label>
                 <input
                   type="number"
                   step="0.01"
-                  min="0.01"
-                  value={formData.valueInitial}
-                  onChange={(e) => setFormData({ ...formData, valueInitial: e.target.value })}
+                  min="0"
+                  value={formData.balance}
+                  onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
                   required
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
@@ -242,46 +260,12 @@ export default function AddCardPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('add_card_value_current')} (₪) *
-                </label>
-                <label className="flex items-center mb-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.sameAsInitial}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        sameAsInitial: e.target.checked,
-                        valueCurrent: e.target.checked ? formData.valueInitial : '',
-                      })
-                    }
-                    className="mr-2"
-                  />
-                  <span>{t('add_card_value_same')}</span>
+                  Expires At (optional)
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.valueCurrent}
-                  onChange={(e) =>
-                    setFormData({ ...formData, valueCurrent: e.target.value, sameAsInitial: false })
-                  }
-                  disabled={formData.sameAsInitial}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('add_card_notes')}
-                </label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  rows={3}
-                  maxLength={1000}
+                  type="date"
+                  value={formData.expiresAt}
+                  onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
@@ -296,7 +280,7 @@ export default function AddCardPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={loading || !formData.valueInitial}
+                  disabled={loading || !formData.balance}
                   className="flex-1 bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? t('common_loading') : t('add_card_save')}
