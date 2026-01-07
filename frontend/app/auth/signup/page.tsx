@@ -7,6 +7,7 @@ import { authAPI } from '@/lib/api';
 import { getTranslation } from '@/lib/translations';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import { Eye, EyeOff } from 'lucide-react';
 
 // Password validation helpers
 const passwordChecks = {
@@ -30,6 +31,8 @@ export default function SignupPage() {
   });
   const [loading, setLoading] = useState(false);
   const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const lang: 'he' | 'en' = 'he';
 
   const t = (key: any) => getTranslation(lang, key);
@@ -114,16 +117,25 @@ export default function SignupPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {t('auth_password')} *
               </label>
-              <input
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                onFocus={() => setShowPasswordRequirements(true)}
-                required
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                  formData.password && !isPasswordValid ? 'border-red-300' : 'border-gray-300'
-                }`}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onFocus={() => setShowPasswordRequirements(true)}
+                  required
+                  className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                    formData.password && !isPasswordValid ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
               {/* Password requirements checklist */}
               {showPasswordRequirements && (
                 <div className="mt-2 p-3 bg-gray-50 rounded-lg text-sm space-y-1">
@@ -151,15 +163,24 @@ export default function SignupPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {t('auth_confirm_password')} *
               </label>
-              <input
-                type="password"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                required
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                  formData.confirmPassword && !passwordsMatch ? 'border-red-300' : 'border-gray-300'
-                }`}
-              />
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  required
+                  className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                    formData.confirmPassword && !passwordsMatch ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
               {formData.confirmPassword && !passwordsMatch && (
                 <p className="mt-1 text-sm text-red-600">Passwords do not match</p>
               )}
