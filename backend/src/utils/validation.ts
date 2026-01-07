@@ -51,29 +51,10 @@ export const validateCard: ValidationChain[] = [
   body('valueCurrent')
     .isFloat({ min: 0 })
     .withMessage('Current value cannot be negative'),
-  body('expiryDate')
-    .isISO8601()
-    .toDate()
-    .withMessage('Valid expiry date is required'),
   body('notes')
     .optional()
     .trim()
     .isLength({ max: 1000 })
     .withMessage('Notes must be less than 1000 characters'),
-];
-
-export const validateBalanceUpdate: ValidationChain[] = [
-  body('newBalance')
-    .isFloat({ min: 0 })
-    .withMessage('Balance cannot be negative'),
-  body('changeType')
-    .optional()
-    .isIn(['manual_update', 'purchase', 'refund', 'correction'])
-    .withMessage('Invalid change type'),
-  body('notes')
-    .optional()
-    .trim()
-    .isLength({ max: 500 })
-    .withMessage('Notes must be less than 500 characters'),
 ];
 

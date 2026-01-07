@@ -32,7 +32,6 @@ export default function AddCardPage() {
     fullCode: '',
     valueInitial: '',
     valueCurrent: '',
-    expiryDate: '',
     notes: '',
     sameAsInitial: true,
   });
@@ -67,7 +66,6 @@ export default function AddCardPage() {
         valueCurrent: formData.sameAsInitial
           ? parseFloat(formData.valueInitial)
           : parseFloat(formData.valueCurrent),
-        expiryDate: formData.expiryDate,
         notes: formData.notes || undefined,
       };
 
@@ -277,20 +275,6 @@ export default function AddCardPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('add_card_expiry')} *
-                </label>
-                <input
-                  type="date"
-                  value={formData.expiryDate}
-                  onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                  required
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
                   {t('add_card_notes')}
                 </label>
                 <textarea
@@ -312,7 +296,7 @@ export default function AddCardPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={loading || !formData.valueInitial || !formData.expiryDate}
+                  disabled={loading || !formData.valueInitial}
                   className="flex-1 bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? t('common_loading') : t('add_card_save')}

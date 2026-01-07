@@ -8,7 +8,16 @@ import { getTranslation } from '@/lib/translations';
 import { useAuthStore } from '@/lib/store';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
-import { differenceInDays } from 'date-fns';
+import { MapPin, ChevronRight } from 'lucide-react';
+
+interface Establishment {
+  id: string;
+  name: string;
+  nameHe?: string;
+  logoUrl?: string;
+  category?: string;
+  notes?: string;
+}
 
 export default function CardDetailsPage() {
   const router = useRouter();
@@ -20,7 +29,8 @@ export default function CardDetailsPage() {
 
   const [card, setCard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [showFullCode, setShowFullCode] = useState(false);
+  const [establishments, setEstablishments] = useState<Establishment[]>([]);
+  const [loadingEstablishments, setLoadingEstablishments] = useState(false);
 
   useEffect(() => {
     loadCard();
@@ -30,11 +40,24 @@ export default function CardDetailsPage() {
     try {
       const response = await cardsAPI.getById(cardId);
       setCard(response.data);
+      loadEstablishments();
     } catch (error: any) {
       toast.error(error.response?.data?.error?.message || t('common_error'));
       router.push('/wallet');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadEstablishments = async () => {
+    setLoadingEstablishments(true);
+    try {
+      const response = await cardsAPI.getEstablishments(cardId);
+      setEstablishments(response.data.establishments || []);
+    } catch (error) {
+      console.error('Failed to load establishments:', error);
+    } finally {
+      setLoadingEstablishments(false);
     }
   };
 
@@ -84,7 +107,6 @@ export default function CardDetailsPage() {
 
   if (!card) return null;
 
-  const daysLeft = differenceInDays(new Date(card.expiryDate), new Date());
   const cardLabel = lang === 'he' && card.labelHe ? card.labelHe : card.label;
   const issuerName = lang === 'he' && card.issuer.nameHe ? card.issuer.nameHe : card.issuer.name;
   const progress = (Number(card.valueCurrent) / Number(card.valueInitial)) * 100;
@@ -114,28 +136,12 @@ export default function CardDetailsPage() {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Link
-            href={`/cards/${cardId}/update-balance`}
-            className="bg-white rounded-lg p-4 text-center shadow-md hover:shadow-lg transition-shadow"
-          >
-            <p className="font-semibold text-sm">{t('card_details_update_balance')}</p>
-          </Link>
           <button
             onClick={handleMarkAsUsed}
             className="bg-white rounded-lg p-4 text-center shadow-md hover:shadow-lg transition-shadow"
           >
             <p className="font-semibold text-sm">{t('card_details_mark_used')}</p>
           </button>
-          {card.issuer.websiteUrl && (
-            <a
-              href={card.issuer.websiteUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-white rounded-lg p-4 text-center shadow-md hover:shadow-lg transition-shadow"
-            >
-              <p className="font-semibold text-sm">{t('card_details_visit_website')}</p>
-            </a>
-          )}
           <button
             onClick={copyCode}
             className="bg-white rounded-lg p-4 text-center shadow-md hover:shadow-lg transition-shadow"
@@ -189,25 +195,54 @@ export default function CardDetailsPage() {
           </div>
         </div>
 
-        {/* Expiry */}
+        {/* Where to Use */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Expiry</h2>
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm text-gray-500">Expiry Date</p>
-              <p className="font-semibold">
-                {new Date(card.expiryDate).toLocaleDateString(lang === 'he' ? 'he-IL' : 'en-US')}
-              </p>
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <MapPin size={20} className="text-primary-600" />
+            {t('card_where_to_use')}
+          </h2>
+          
+          {loadingEstablishments ? (
+            <div className="flex justify-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
             </div>
-            {card.status === 'active' && (
-              <div>
-                <p className="text-sm text-gray-500">Time Until Expiry</p>
-                <p className="text-2xl font-bold">
-                  {daysLeft >= 0 ? `${daysLeft} ${t('card_days_left')}` : t('card_expired')}
-                </p>
-              </div>
-            )}
-          </div>
+          ) : establishments.length > 0 ? (
+            <div className="space-y-2">
+              {establishments.slice(0, 5).map((establishment) => {
+                const estName = lang === 'he' && establishment.nameHe ? establishment.nameHe : establishment.name;
+                return (
+                  <Link
+                    key={establishment.id}
+                    href={`/search/${establishment.id}`}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      {establishment.logoUrl ? (
+                        <img
+                          src={establishment.logoUrl}
+                          alt={estName}
+                          className="w-8 h-8 rounded object-contain bg-white"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center">
+                          <MapPin size={16} className="text-gray-400" />
+                        </div>
+                      )}
+                      <span className="font-medium text-gray-900">{estName}</span>
+                      {establishment.notes && (
+                        <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">
+                          {establishment.notes}
+                        </span>
+                      )}
+                    </div>
+                    <ChevronRight size={18} className="text-gray-400" />
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-4">{t('card_no_stores_found')}</p>
+          )}
         </div>
 
         {/* Notes */}

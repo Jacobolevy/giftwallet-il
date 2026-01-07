@@ -70,82 +70,35 @@ export const authAPI = {
     api.post('/auth/signup', data),
   login: (data: { email: string; password: string; remember_me?: boolean }) =>
     api.post('/auth/login', data),
-  devLogin: (data?: { email?: string; name?: string; language_preference?: string }) =>
-    api.post('/auth/dev-login', data ?? {}),
   logout: () =>
     api.post('/auth/logout'),
-  refresh: () =>
-    api.post('/auth/refresh'),
-  forgotPassword: (email: string) =>
-    api.post('/auth/forgot-password', { email }),
-  resetPassword: (data: { token: string; new_password: string }) =>
-    api.post('/auth/reset-password', data),
 };
 
 // Cards API
 export const cardsAPI = {
-  getAll: (filters?: { status?: string; issuer_id?: string; sort?: string; order?: string; expiring_soon?: boolean; page?: number; limit?: number }) =>
-    api.get('/cards', { params: filters }),
+  getAll: () => api.get('/cards'),
   getById: (id: string) =>
     api.get(`/cards/${id}`),
   create: (data: any) =>
     api.post('/cards', data),
-  update: (id: string, data: any) =>
-    api.put(`/cards/${id}`, data),
-  updateBalance: (id: string, data: { new_balance?: number; deduct_amount?: number; change_type?: string; notes?: string; store_name?: string }) =>
-    api.patch(`/cards/${id}/balance`, data),
-  markAsUsed: (id: string, notes?: string) =>
-    api.post(`/cards/${id}/mark-used`, { notes }),
+  markAsUsed: (id: string) => api.post(`/cards/${id}/mark-used`),
   delete: (id: string) =>
     api.delete(`/cards/${id}`),
   getFullCode: (id: string) =>
     api.get(`/cards/${id}/full-code`),
-  getStats: () =>
-    api.get('/cards/stats'),
-  getHistory: (id: string, params?: { limit?: number; offset?: number }) =>
-    api.get(`/cards/${id}/history`, { params }),
+  getEstablishments: (id: string) => api.get(`/cards/${id}/establishments`),
 };
 
 // Issuers API
 export const issuersAPI = {
-  getAll: (language?: string) =>
-    api.get('/issuers', { params: { language } }),
+  getAll: () => api.get('/issuers'),
+};
+
+// Establishments API
+export const establishmentsAPI = {
+  search: (search?: string) => api.get('/establishments', { params: { search } }),
   getById: (id: string) =>
-    api.get(`/issuers/${id}`),
-};
-
-// Users API
-export const usersAPI = {
-  getProfile: () =>
-    api.get('/users/me'),
-  updateProfile: (data: any) =>
-    api.patch('/users/me', data),
-  changePassword: (data: { current_password: string; new_password: string; confirm_password: string }) =>
-    api.put('/users/me/password', data),
-  exportData: (format: 'json' | 'csv' = 'json') =>
-    api.get('/users/me/export', { params: { format } }),
-  deleteAccount: (data: { password: string; confirmation: string }) =>
-    api.delete('/users/me', { data }),
-};
-
-// Reminders API
-export const remindersAPI = {
-  getAll: (filters?: { sent?: boolean; card_id?: string; upcoming?: boolean }) =>
-    api.get('/reminders', { params: filters }),
-  getById: (id: string) =>
-    api.get(`/reminders/${id}`),
-  markRead: (id: string) =>
-    api.patch(`/reminders/${id}/read`),
-};
-
-// Statistics API (for future implementation)
-export const statisticsAPI = {
-  getOverview: () =>
-    api.get('/statistics/overview'),
-  getByIssuer: () =>
-    api.get('/statistics/by-issuer'),
-  getExpiryTimeline: (months_ahead?: number) =>
-    api.get('/statistics/expiry-timeline', { params: { months_ahead } }),
-  getSpendingTrends: (period?: string, periods_count?: number) =>
-    api.get('/statistics/spending-trends', { params: { period, periods_count } }),
+    api.get(`/establishments/${id}`),
+  getMyCards: (id: string) =>
+    api.get(`/establishments/${id}/my-cards`),
 };

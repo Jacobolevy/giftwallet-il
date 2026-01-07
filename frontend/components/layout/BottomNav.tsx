@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Plus, User } from 'lucide-react';
+import { Home, Plus, Search } from 'lucide-react';
 import { getTranslation } from '@/lib/translations';
 import { useAuthStore } from '@/lib/store';
 
@@ -15,8 +15,8 @@ export default function BottomNav() {
 
   const navItems = [
     { href: '/wallet', icon: Home, label: t('nav_home') },
+    { href: '/search', icon: Search, label: t('nav_search') },
     { href: '/cards/add', icon: Plus, label: t('nav_add') },
-    { href: '/profile', icon: User, label: t('nav_profile') },
   ];
 
   return (

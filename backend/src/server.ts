@@ -1,12 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { startScheduledJobs } from './jobs/scheduler';
 import authRoutes from './routes/auth';
 import cardRoutes from './routes/cards';
 import issuerRoutes from './routes/issuers';
-import userRoutes from './routes/users';
-import reminderRoutes from './routes/reminders';
+import establishmentRoutes from './routes/establishments';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
 
@@ -30,11 +28,6 @@ app.get('/health', (req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
-    services: {
-      database: 'ok',
-      email: 'ok',
-      storage: 'ok',
-    },
   });
 });
 
@@ -42,15 +35,13 @@ app.get('/health', (req, res) => {
 app.use(`/api/${API_VERSION}/auth`, authRoutes);
 app.use(`/api/${API_VERSION}/cards`, cardRoutes);
 app.use(`/api/${API_VERSION}/issuers`, issuerRoutes);
-app.use(`/api/${API_VERSION}/users`, userRoutes);
-app.use(`/api/${API_VERSION}/reminders`, reminderRoutes);
+app.use(`/api/${API_VERSION}/establishments`, establishmentRoutes);
 
 // Also support /api routes for backward compatibility
 app.use('/api/auth', authRoutes);
 app.use('/api/cards', cardRoutes);
 app.use('/api/issuers', issuerRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/reminders', reminderRoutes);
+app.use('/api/establishments', establishmentRoutes);
 
 // Error handling
 app.use(notFoundHandler);
@@ -61,10 +52,6 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 API Base: http://localhost:${PORT}/api/${API_VERSION}`);
-  
-  // Start scheduled jobs
-  startScheduledJobs();
-  console.log('⏰ Scheduled jobs started');
 });
 
 export default app;

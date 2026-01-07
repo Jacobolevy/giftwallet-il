@@ -18,7 +18,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const lang: 'he' | 'en' = 'he'; // TODO: Get from user preference
+  const lang: 'he' | 'en' = 'he';
 
   const t = (key: any) => getTranslation(lang, key);
 
@@ -142,9 +142,7 @@ export default function LoginPage() {
                 />
                 <span className="text-sm text-gray-600">{t('auth_remember')}</span>
               </label>
-              <Link href="/auth/forgot-password" className="text-sm text-primary-600 hover:underline">
-                {t('auth_forgot_password')}
-              </Link>
+              {/* Password reset is not part of MVP */}
             </div>
 
             <button

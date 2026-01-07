@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
-import { cardsAPI } from '@/lib/api';
+import { authAPI, cardsAPI } from '@/lib/api';
 import { getTranslation } from '@/lib/translations';
 import { useAuthStore } from '@/lib/store';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { Plus, LogOut } from 'lucide-react';
 
 interface Card {
   id: string;
@@ -16,7 +16,6 @@ interface Card {
   codeLast4: string;
   valueCurrent: number;
   valueInitial: number;
-  expiryDate: string;
   status: string;
   issuer: {
     name: string;
@@ -32,11 +31,6 @@ export default function WalletPage() {
   const t = (key: any) => getTranslation(lang, key);
 
   const [cards, setCards] = useState<Card[]>([]);
-  const [stats, setStats] = useState({
-    totalActiveValue: 0,
-    activeCards: 0,
-    expiringSoon: 0,
-  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,16 +39,10 @@ export default function WalletPage() {
 
   const loadData = async () => {
     try {
-      const [cardsRes, statsRes] = await Promise.all([
-        cardsAPI.getAll(),
-        cardsAPI.getStats(),
-      ]);
-
-      // Backend returns { cards: [...], pagination, summary } - extract the array
+      const cardsRes = await cardsAPI.getAll();
       const cardsData = cardsRes.data;
       const cardsArray = Array.isArray(cardsData) ? cardsData : (cardsData?.cards ?? []);
       setCards(cardsArray);
-      setStats(statsRes.data);
     } catch (error: any) {
       toast.error(error.response?.data?.error?.message || t('common_error'));
     } finally {
@@ -62,23 +50,16 @@ export default function WalletPage() {
     }
   };
 
-  const getDaysUntilExpiry = (expiryDate: string) => {
-    const today = new Date();
-    const expiry = new Date(expiryDate);
-    const diffTime = expiry.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  const getStatusColor = (card: Card) => {
-    if (card.status === 'expired' || card.status === 'used') {
-      return 'bg-gray-500';
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+    } catch {
+      // ignore - stateless JWT logout
     }
-
-    const daysLeft = getDaysUntilExpiry(card.expiryDate);
-    if (daysLeft <= 7) return 'bg-red-500';
-    if (daysLeft <= 30) return 'bg-yellow-500';
-    return 'bg-green-500';
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token');
+      window.location.href = '/auth/login';
+    }
   };
 
   if (loading) {
@@ -94,23 +75,15 @@ export default function WalletPage() {
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Header Summary */}
-        <div className="bg-gradient-to-r from-primary-600 to-primary-800 rounded-2xl p-6 text-white mb-6 shadow-lg">
-          <h1 className="text-2xl font-bold mb-4">{t('wallet_title')}</h1>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <p className="text-sm opacity-90">{t('wallet_total_value')}</p>
-              <p className="text-3xl font-bold">₪{stats.totalActiveValue.toFixed(0)}</p>
-            </div>
-            <div>
-              <p className="text-sm opacity-90">{t('wallet_active_cards')}</p>
-              <p className="text-3xl font-bold">{stats.activeCards}</p>
-            </div>
-            <div>
-              <p className="text-sm opacity-90">{t('wallet_expiring_soon')}</p>
-              <p className="text-3xl font-bold">{stats.expiringSoon}</p>
-            </div>
-          </div>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">{t('wallet_title')}</h1>
+          <button
+            onClick={handleLogout}
+            className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
+          >
+            <LogOut size={18} />
+            <span>{t('profile_logout')}</span>
+          </button>
         </div>
 
         {/* Cards Grid */}
@@ -131,7 +104,6 @@ export default function WalletPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {cards.map((card) => {
-              const daysLeft = getDaysUntilExpiry(card.expiryDate);
               const cardLabel = lang === 'he' && card.labelHe ? card.labelHe : card.label;
               const issuerName = lang === 'he' && card.issuer.nameHe ? card.issuer.nameHe : card.issuer.name;
               const progress = (Number(card.valueCurrent) / Number(card.valueInitial)) * 100;
@@ -150,11 +122,9 @@ export default function WalletPage() {
                       <h3 className="font-semibold text-lg text-gray-900">{cardLabel}</h3>
                       <p className="text-sm text-gray-500">{issuerName}</p>
                     </div>
-                    <div
-                      className={`w-3 h-3 rounded-full ${getStatusColor(card)} ${
-                        card.status === 'active' ? 'animate-pulse' : ''
-                      }`}
-                    />
+                    <div className="text-xs font-semibold text-gray-500 uppercase">
+                      {card.status}
+                    </div>
                   </div>
 
                   <div className="mb-4">
@@ -170,17 +140,6 @@ export default function WalletPage() {
                   </div>
 
                   <div className="text-sm text-gray-600">
-                    <p>
-                      {t('card_expires')}: {new Date(card.expiryDate).toLocaleDateString(lang === 'he' ? 'he-IL' : 'en-US')}
-                    </p>
-                    {card.status === 'active' && daysLeft >= 0 && (
-                      <p className="font-semibold">
-                        {daysLeft} {t('card_days_left')}
-                      </p>
-                    )}
-                    {card.status === 'expired' && (
-                      <p className="text-red-600 font-semibold">{t('card_expired')}</p>
-                    )}
                     {card.status === 'used' && (
                       <p className="text-gray-500 font-semibold">{t('card_used')}</p>
                     )}

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { signup, login, logout, refresh, forgotPassword, resetPassword, devLogin } from '../controllers/authController';
+import { signup, login, logout } from '../controllers/authController';
 import { validateSignup, validateLogin } from '../utils/validation';
 import { validationResult } from 'express-validator';
 import { authRateLimiter, signupRateLimiter } from '../middleware/rateLimiter';
@@ -28,11 +28,5 @@ const handleValidationErrors = (req: any, res: any, next: any) => {
 router.post('/signup', signupRateLimiter, validateSignup, handleValidationErrors, signup);
 router.post('/login', authRateLimiter, validateLogin, handleValidationErrors, login);
 router.post('/logout', authenticate, logout);
-router.post('/refresh', authenticate, refresh);
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password', resetPassword);
-
-// DEV-only: obtain a demo JWT without credentials (guarded in controller)
-router.post('/dev-login', authRateLimiter, devLogin);
 
 export default router;

@@ -18,21 +18,12 @@ enum Language {
 enum CardStatus {
   active
   used
-  expired
 }
 
-enum ReminderType {
-  thirty_days_before
-  seven_days_before
-  three_days_before
-  one_day_before
-}
-
-enum ChangeType {
-  manual_update
-  purchase
-  refund
-  correction
+enum IssuerEstablishmentType {
+  physical
+  online
+  both
 }
 
 model User {
@@ -42,13 +33,10 @@ model User {
   phone                     String?
   name                      String?
   languagePreference        Language @default(he) @map("language_preference")
-  emailNotificationsEnabled Boolean  @default(true) @map("email_notifications_enabled")
-  pushNotificationsEnabled  Boolean  @default(true) @map("push_notifications_enabled")
   createdAt                 DateTime @default(now()) @map("created_at")
   updatedAt                 DateTime @updatedAt @map("updated_at")
 
-  giftCards GiftCard[]
-  reminders Reminder[]
+  cards Card[]
 
   @@map("users")
 }
@@ -57,22 +45,18 @@ model Issuer {
   id              String   @id @default(uuid())
   name            String
   nameHe          String?  @map("name_he")
-  websiteUrl      String?  @map("website_url")
   logoUrl         String?  @map("logo_url")
   brandColor      String?  @map("brand_color")
-  supportPhone    String?  @map("support_phone")
-  supportEmail    String?  @map("support_email")
   notes           String?
-  apiEndpoint     String?  @map("api_endpoint")
-  balanceCheckUrl String?  @map("balance_check_url")
   createdAt       DateTime @default(now()) @map("created_at")
 
-  giftCards GiftCard[]
+  cards          Card[]
+  establishments IssuerEstablishment[]
 
   @@map("issuers")
 }
 
-model GiftCard {
+model Card {
   id                String     @id @default(uuid())
   userId            String     @map("user_id")
   issuerId          String     @map("issuer_id")
@@ -83,50 +67,41 @@ model GiftCard {
   valueInitial      Float      @map("value_initial")
   valueCurrent      Float      @map("value_current")
   currency          String     @default("ILS")
-  expiryDate        DateTime   @map("expiry_date")
   status            CardStatus @default(active)
   notes             String?
   photoUrl          String?    @map("photo_url")
-  lastBalanceUpdate DateTime?  @map("last_balance_update")
   createdAt         DateTime   @default(now()) @map("created_at")
   updatedAt         DateTime   @updatedAt @map("updated_at")
 
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   issuer          Issuer          @relation(fields: [issuerId], references: [id])
-  reminders       Reminder[]
-  balanceHistory  BalanceHistory[]
 
   @@map("gift_cards")
 }
 
-model Reminder {
-  id          String       @id @default(uuid())
-  userId      String       @map("user_id")
-  giftcardId  String       @map("giftcard_id")
-  reminderDate DateTime    @map("reminder_date")
-  type        ReminderType
-  sentFlag    Boolean      @default(false) @map("sent_flag")
-  sentAt      DateTime?    @map("sent_at")
-  createdAt   DateTime     @default(now()) @map("created_at")
+model Establishment {
+  id        String   @id @default(uuid())
+  name      String
+  nameHe    String?  @map("name_he")
+  logoUrl   String?  @map("logo_url")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  giftCard GiftCard  @relation(fields: [giftcardId], references: [id], onDelete: Cascade)
+  issuers IssuerEstablishment[]
 
-  @@map("reminders")
+  @@map("establishments")
 }
 
-model BalanceHistory {
-  id             String     @id @default(uuid())
-  giftcardId     String     @map("giftcard_id")
-  previousBalance Float     @map("previous_balance")
-  newBalance     Float      @map("new_balance")
-  changeAmount   Float      @map("change_amount")
-  changeType     ChangeType @map("change_type")
-  notes          String?
-  createdAt      DateTime   @default(now()) @map("created_at")
+model IssuerEstablishment {
+  id              String    @id @default(uuid())
+  issuerId        String    @map("issuer_id")
+  establishmentId String    @map("establishment_id")
+  type            IssuerEstablishmentType @default(both)
+  notes           String?   // e.g., "Online only", "Excluding sale items"
 
-  giftCard GiftCard @relation(fields: [giftcardId], references: [id], onDelete: Cascade)
+  issuer        Issuer        @relation(fields: [issuerId], references: [id], onDelete: Cascade)
+  establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
 
-  @@map("balance_history")
+  @@unique([issuerId, establishmentId])
+  @@map("issuer_establishments")
 }
 

@@ -88,6 +88,40 @@ export const translations = {
     common_loading: 'Loading...',
     common_error: 'An error occurred',
     common_success: 'Success!',
+    common_back: 'Back',
+
+    // Navigation - Search
+    nav_search: 'Search',
+
+    // Search
+    search_stores_title: 'Find Where to Spend',
+    search_stores_placeholder: 'Search stores...',
+    search_you_can_spend: 'You can spend here',
+    search_other_stores: 'Other stores',
+    search_no_results: 'No stores found',
+    search_hint: 'Type to search for stores or select a category',
+    search_recent: 'Recent searches',
+    search_card: 'card',
+    search_cards: 'cards',
+    search_expires_soon: 'expires soon',
+    search_more: 'more',
+    search_total_to_spend: 'Total to spend',
+    search_from_cards: 'From cards',
+    search_your_cards: 'Your cards for this store',
+    search_no_cards_here: 'You don\'t have cards for this store yet',
+    search_tip_title: 'Tip',
+    search_tip_combine: 'You may need to split your payment if using multiple cards',
+
+    // Card Details - Where to Use
+    card_where_to_use: 'Where to use',
+    card_see_all_stores: 'See all stores',
+    card_no_stores_found: 'No stores information available',
+
+    // Wallet - Top Places
+    wallet_top_places: 'Top places to spend',
+    wallet_see_all: 'See all',
+    wallet_find_more: 'Find more',
+    wallet_expiring: 'Expiring',
   },
   he: {
     // Navigation
@@ -178,6 +212,40 @@ export const translations = {
     common_loading: 'טוען...',
     common_error: 'אירעה שגיאה',
     common_success: 'הצלחה!',
+    common_back: 'חזור',
+
+    // Navigation - Search
+    nav_search: 'חיפוש',
+
+    // Search
+    search_stores_title: 'איפה אפשר לקנות?',
+    search_stores_placeholder: 'חפש חנויות...',
+    search_you_can_spend: 'כאן יש לך כסף',
+    search_other_stores: 'חנויות נוספות',
+    search_no_results: 'לא נמצאו חנויות',
+    search_hint: 'הקלד לחיפוש חנויות או בחר קטגוריה',
+    search_recent: 'חיפושים אחרונים',
+    search_card: 'כרטיס',
+    search_cards: 'כרטיסים',
+    search_expires_soon: 'פג תוקף בקרוב',
+    search_more: 'עוד',
+    search_total_to_spend: 'סה"כ לשימוש',
+    search_from_cards: 'מכרטיסים',
+    search_your_cards: 'הכרטיסים שלך לחנות זו',
+    search_no_cards_here: 'אין לך כרטיסים לחנות זו עדיין',
+    search_tip_title: 'טיפ',
+    search_tip_combine: 'ייתכן שתצטרך לפצל את התשלום אם משתמש בכמה כרטיסים',
+
+    // Card Details - Where to Use
+    card_where_to_use: 'איפה אפשר להשתמש',
+    card_see_all_stores: 'ראה את כל החנויות',
+    card_no_stores_found: 'אין מידע על חנויות זמין',
+
+    // Wallet - Top Places
+    wallet_top_places: 'המקומות המובילים',
+    wallet_see_all: 'ראה הכל',
+    wallet_find_more: 'מצא עוד',
+    wallet_expiring: 'פג בקרוב',
   },
 };
 
