@@ -1,12 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store';
 import { authAPI } from '@/lib/api';
 import { getTranslation } from '@/lib/translations';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+
+// Password validation helpers
+const passwordChecks = {
+  minLength: (pwd: string) => pwd.length >= 8,
+  hasUppercase: (pwd: string) => /[A-Z]/.test(pwd),
+  hasLowercase: (pwd: string) => /[a-z]/.test(pwd),
+  hasNumber: (pwd: string) => /[0-9]/.test(pwd),
+  hasSpecial: (pwd: string) => /[!@#$%^&*(),.?":{}|<>]/.test(pwd),
+};
 
 export default function SignupPage() {
   const router = useRouter();
@@ -20,20 +29,33 @@ export default function SignupPage() {
     languagePreference: 'he' as 'he' | 'en',
   });
   const [loading, setLoading] = useState(false);
+  const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
   const lang: 'he' | 'en' = 'he';
 
   const t = (key: any) => getTranslation(lang, key);
 
+  // Password validation state
+  const passwordValidation = useMemo(() => ({
+    minLength: passwordChecks.minLength(formData.password),
+    hasUppercase: passwordChecks.hasUppercase(formData.password),
+    hasLowercase: passwordChecks.hasLowercase(formData.password),
+    hasNumber: passwordChecks.hasNumber(formData.password),
+    hasSpecial: passwordChecks.hasSpecial(formData.password),
+  }), [formData.password]);
+
+  const isPasswordValid = Object.values(passwordValidation).every(Boolean);
+  const passwordsMatch = formData.password === formData.confirmPassword;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match');
+    if (!isPasswordValid) {
+      toast.error('Password does not meet requirements');
       return;
     }
 
-    if (formData.password.length < 8) {
-      toast.error('Password must be at least 8 characters');
+    if (!passwordsMatch) {
+      toast.error('Passwords do not match');
       return;
     }
 
@@ -96,10 +118,33 @@ export default function SignupPage() {
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                onFocus={() => setShowPasswordRequirements(true)}
                 required
-                minLength={8}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                  formData.password && !isPasswordValid ? 'border-red-300' : 'border-gray-300'
+                }`}
               />
+              {/* Password requirements checklist */}
+              {showPasswordRequirements && (
+                <div className="mt-2 p-3 bg-gray-50 rounded-lg text-sm space-y-1">
+                  <p className="font-medium text-gray-700 mb-2">Password must have:</p>
+                  <div className={`flex items-center gap-2 ${passwordValidation.minLength ? 'text-green-600' : 'text-gray-500'}`}>
+                    {passwordValidation.minLength ? '✓' : '○'} At least 8 characters
+                  </div>
+                  <div className={`flex items-center gap-2 ${passwordValidation.hasUppercase ? 'text-green-600' : 'text-gray-500'}`}>
+                    {passwordValidation.hasUppercase ? '✓' : '○'} One uppercase letter (A-Z)
+                  </div>
+                  <div className={`flex items-center gap-2 ${passwordValidation.hasLowercase ? 'text-green-600' : 'text-gray-500'}`}>
+                    {passwordValidation.hasLowercase ? '✓' : '○'} One lowercase letter (a-z)
+                  </div>
+                  <div className={`flex items-center gap-2 ${passwordValidation.hasNumber ? 'text-green-600' : 'text-gray-500'}`}>
+                    {passwordValidation.hasNumber ? '✓' : '○'} One number (0-9)
+                  </div>
+                  <div className={`flex items-center gap-2 ${passwordValidation.hasSpecial ? 'text-green-600' : 'text-gray-500'}`}>
+                    {passwordValidation.hasSpecial ? '✓' : '○'} One special character (!@#$%^&*)
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
@@ -111,8 +156,13 @@ export default function SignupPage() {
                 value={formData.confirmPassword}
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                  formData.confirmPassword && !passwordsMatch ? 'border-red-300' : 'border-gray-300'
+                }`}
               />
+              {formData.confirmPassword && !passwordsMatch && (
+                <p className="mt-1 text-sm text-red-600">Passwords do not match</p>
+              )}
             </div>
 
             <div>
@@ -141,7 +191,7 @@ export default function SignupPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !isPasswordValid || !passwordsMatch || !formData.confirmPassword}
               className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? t('common_loading') : t('auth_signup')}
