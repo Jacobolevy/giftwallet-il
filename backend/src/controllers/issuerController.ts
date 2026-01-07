@@ -8,18 +8,36 @@ export const getAllIssuers = async (req: Request, res: Response): Promise<void> 
   try {
     const issuers = await prisma.issuer.findMany({
       orderBy: { name: 'asc' },
+      include: {
+        products: {
+          orderBy: { name: 'asc' },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            sourceUrl: true,
+            lastVerifiedAt: true,
+          },
+        },
+      },
     });
 
-    const formatted = issuers.map((issuer) => ({
-      id: issuer.id,
-      name: issuer.name,
-      name_he: issuer.nameHe,
-      logo_url: issuer.logoUrl,
-      brand_color: issuer.brandColor,
-      notes: issuer.notes,
-    }));
-
-    sendSuccess(res, formatted);
+    sendSuccess(
+      res,
+      issuers.map((issuer) => ({
+        id: issuer.id,
+        name: issuer.name,
+        website_url: issuer.websiteUrl,
+        logo_url: issuer.logoUrl,
+        products: issuer.products.map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          source_url: p.sourceUrl,
+          last_verified_at: p.lastVerifiedAt,
+        })),
+      }))
+    );
   } catch (error: any) {
     sendError(res, 'INTERNAL_SERVER_ERROR', error.message, 500);
   }

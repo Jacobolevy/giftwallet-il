@@ -13,15 +13,21 @@ export const createCard = async (req: AuthRequest, res: Response): Promise<void>
 
     sendSuccess(res, {
       id: card.id,
-      issuer: card.issuer,
-      label: card.label,
-      labelHe: card.labelHe,
+      cardProduct: {
+        id: card.cardProduct.id,
+        name: card.cardProduct.name,
+        description: card.cardProduct.description,
+        issuer: {
+          id: card.cardProduct.issuer.id,
+          name: card.cardProduct.issuer.name,
+          logoUrl: card.cardProduct.issuer.logoUrl,
+        },
+      },
+      nickname: card.nickname,
       codeLast4: card.codeLast4,
-      valueInitial: Number(card.valueInitial),
-      valueCurrent: Number(card.valueCurrent),
-      currency: card.currency,
+      balance: Number(card.balance),
+      expiresAt: card.expiresAt,
       status: card.status,
-      notes: card.notes,
       createdAt: card.createdAt,
     }, 201);
   } catch (error: any) {
@@ -36,15 +42,20 @@ export const getCards = async (req: AuthRequest, res: Response): Promise<void> =
       res,
       cards.map((card) => ({
         id: card.id,
-        issuer: card.issuer,
-        label: card.label,
-        labelHe: card.labelHe,
+        cardProduct: {
+          id: card.cardProduct.id,
+          name: card.cardProduct.name,
+          issuer: {
+            id: card.cardProduct.issuer.id,
+            name: card.cardProduct.issuer.name,
+            logoUrl: card.cardProduct.issuer.logoUrl,
+          },
+        },
+        nickname: card.nickname,
         codeLast4: card.codeLast4,
-        valueInitial: Number(card.valueInitial),
-        valueCurrent: Number(card.valueCurrent),
-        currency: card.currency,
+        balance: Number(card.balance),
+        expiresAt: card.expiresAt,
         status: card.status,
-        notes: card.notes,
         createdAt: card.createdAt,
         updatedAt: card.updatedAt,
       }))
@@ -59,15 +70,22 @@ export const getCard = async (req: AuthRequest, res: Response): Promise<void> =>
     const card = await cardService.getCardById(req.params.id, req.userId!);
     sendSuccess(res, {
       id: card.id,
-      issuer: card.issuer,
-      label: card.label,
-      labelHe: card.labelHe,
+      cardProduct: {
+        id: card.cardProduct.id,
+        name: card.cardProduct.name,
+        description: card.cardProduct.description,
+        issuer: {
+          id: card.cardProduct.issuer.id,
+          name: card.cardProduct.issuer.name,
+          websiteUrl: card.cardProduct.issuer.websiteUrl,
+          logoUrl: card.cardProduct.issuer.logoUrl,
+        },
+      },
+      nickname: card.nickname,
       codeLast4: card.codeLast4,
-      valueInitial: Number(card.valueInitial),
-      valueCurrent: Number(card.valueCurrent),
-      currency: card.currency,
+      balance: Number(card.balance),
+      expiresAt: card.expiresAt,
       status: card.status,
-      notes: card.notes,
       createdAt: card.createdAt,
       updatedAt: card.updatedAt,
     });
@@ -89,7 +107,7 @@ export const markAsUsed = async (req: AuthRequest, res: Response): Promise<void>
     
     sendSuccess(res, {
       id: card.id,
-      valueCurrent: 0,
+      balance: 0,
       status: card.status,
       updatedAt: card.updatedAt,
     }, 200);
@@ -120,8 +138,8 @@ export const getCardFullCode = async (req: AuthRequest, res: Response): Promise<
 
 export const getCardEstablishments = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const establishments = await establishmentService.getEstablishmentsForCard(req.userId!, req.params.id);
-    sendSuccess(res, { establishments });
+    const stores = await establishmentService.getStoresForUserCard(req.userId!, req.params.id);
+    sendSuccess(res, { stores });
   } catch (error: any) {
     if (error.message === 'Card not found') {
       sendError(res, 'NOT_FOUND', 'Card not found', 404);

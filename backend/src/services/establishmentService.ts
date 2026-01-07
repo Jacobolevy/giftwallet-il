@@ -1,160 +1,143 @@
-import { PrismaClient, CardStatus } from '@prisma/client';
+import { PrismaClient, UserCardStatus } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export const searchEstablishments = async (query: string) => {
-  return prisma.establishment.findMany({
-    where: {
-      OR: [
-        { name: { contains: query, mode: 'insensitive' } },
-        { nameHe: { contains: query, mode: 'insensitive' } },
-      ],
-    },
-    include: {
-      issuers: {
-        include: {
-          issuer: true,
-        },
-      },
-    },
-    orderBy: { name: 'asc' },
-  });
-};
-
-export const getEstablishmentById = async (id: string) => {
-  return prisma.establishment.findUnique({
-    where: { id },
-    include: {
-      issuers: {
-        include: {
-          issuer: true,
-        },
-      },
-    },
-  });
-};
-
 export const getUserCardsForEstablishment = async (
   userId: string,
-  establishmentId: string
+  storeId: string
 ) => {
-  // Get all issuer IDs that are accepted at this establishment
-  const establishment = await prisma.establishment.findUnique({
-    where: { id: establishmentId },
-    include: {
-      issuers: {
-        select: { issuerId: true },
-      },
-    },
-  });
+  const store = await prisma.store.findUnique({ where: { id: storeId } });
+  if (!store) throw new Error('Store not found');
 
-  if (!establishment) {
-    throw new Error('Establishment not found');
-  }
-
-  const issuerIds = establishment.issuers.map((ie) => ie.issuerId);
-
-  // Get user's active cards from these issuers
-  const cards = await prisma.card.findMany({
+  // Fetch the user's active cards whose CardProduct is usable at this store
+  const userCards = await prisma.userCard.findMany({
     where: {
       userId,
-      issuerId: { in: issuerIds },
-      status: CardStatus.active,
+      status: UserCardStatus.active,
+      balance: { gt: 0 },
+      cardProduct: {
+        stores: {
+          some: { storeId },
+        },
+      },
     },
     include: {
-      issuer: true,
+      cardProduct: { include: { issuer: true } },
     },
     orderBy: { createdAt: 'desc' },
   });
 
-  // Calculate total available balance
-  const totalAmount = cards.reduce(
-    (sum, card) => sum + Number(card.valueCurrent),
-    0
-  );
+  const totalAmount = userCards.reduce((sum, c) => sum + Number(c.balance || 0), 0);
 
-  return {
-    establishment,
-    cards,
-    totalAmount,
-  };
+  return { store, cards: userCards, totalAmount };
 };
 
-// Search establishments and return with user's card totals
-export const searchEstablishmentsWithUserCards = async (
-  userId: string,
-  query?: string
-) => {
-  if (!query || query.length < 2) return [];
+/**
+ * Search stores by name, but return ONLY stores where the user has spendable balance > 0
+ * via their active UserCards and the CardProductStore mapping.
+ */
+export const searchStoresWithUserBalance = async (userId: string, q?: string) => {
+  if (!q || q.trim().length < 2) return [];
+  const query = q.trim();
 
-  const establishments = await searchEstablishments(query);
-
-  const results = await Promise.all(
-    establishments.map(async (establishment) => {
-      const issuerIds = establishment.issuers.map((ie) => ie.issuerId);
-
-      const cards = await prisma.card.findMany({
-        where: {
-          userId,
-          issuerId: { in: issuerIds },
-          status: CardStatus.active,
+  // Load user's active cards with balance > 0 and their product-store relationships
+  const userCards = await prisma.userCard.findMany({
+    where: {
+      userId,
+      status: UserCardStatus.active,
+      balance: { gt: 0 },
+    },
+    include: {
+      cardProduct: {
+        include: {
+          issuer: true,
+          stores: { include: { store: true } },
         },
-        include: { issuer: true },
-        orderBy: { createdAt: 'desc' },
+      },
+    },
+  });
+
+  // Build store totals and breakdown, then filter by store name match
+  const storeMap = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      category?: string | null;
+      websiteUrl?: string | null;
+      totalAmount: number;
+      cards: Array<{
+        id: string;
+        nickname?: string | null;
+        balance: number;
+        cardProduct: { id: string; name: string; issuer: { id: string; name: string; logoUrl?: string | null } };
+      }>;
+    }
+  >();
+
+  for (const card of userCards) {
+    const usableStores = card.cardProduct.stores.map((s) => s.store);
+    for (const store of usableStores) {
+      const match =
+        store.name.toLowerCase().includes(query.toLowerCase()) ||
+        (store.category || '').toLowerCase().includes(query.toLowerCase());
+      if (!match) continue;
+
+      const existing =
+        storeMap.get(store.id) ||
+        {
+          id: store.id,
+          name: store.name,
+          category: store.category,
+          websiteUrl: store.websiteUrl,
+          totalAmount: 0,
+          cards: [],
+        };
+
+      existing.totalAmount += Number(card.balance || 0);
+      existing.cards.push({
+        id: card.id,
+        nickname: card.nickname,
+        balance: Number(card.balance || 0),
+        cardProduct: {
+          id: card.cardProduct.id,
+          name: card.cardProduct.name,
+          issuer: {
+            id: card.cardProduct.issuer.id,
+            name: card.cardProduct.issuer.name,
+            logoUrl: card.cardProduct.issuer.logoUrl,
+          },
+        },
       });
 
-      const totalAmount = cards.reduce(
-        (sum, card) => sum + Number(card.valueCurrent),
-        0
-      );
+      storeMap.set(store.id, existing);
+    }
+  }
 
-      return {
-        id: establishment.id,
-        name: establishment.name,
-        nameHe: establishment.nameHe,
-        logoUrl: establishment.logoUrl,
-        totalAmount,
-        cards: cards.map((card) => ({
-          id: card.id,
-          label: card.label,
-          labelHe: card.labelHe,
-          valueCurrent: Number(card.valueCurrent),
-          issuer: {
-            id: card.issuer.id,
-            name: card.issuer.name,
-            nameHe: card.issuer.nameHe,
-            brandColor: card.issuer.brandColor,
-            logoUrl: card.issuer.logoUrl,
-          },
-        })),
-      };
-    })
-  );
-
-  return results.sort((a, b) => b.totalAmount - a.totalAmount || a.name.localeCompare(b.name));
+  return Array.from(storeMap.values()).sort((a, b) => b.totalAmount - a.totalAmount || a.name.localeCompare(b.name));
 };
 
-export const getEstablishmentsForCard = async (userId: string, cardId: string) => {
-  const card = await prisma.card.findFirst({
-    where: { id: cardId, userId },
-    select: { issuerId: true },
+export const getStoresForUserCard = async (userId: string, userCardId: string) => {
+  const card = await prisma.userCard.findFirst({
+    where: { id: userCardId, userId },
+    include: {
+      cardProduct: {
+        include: {
+          stores: { include: { store: true } },
+        },
+      },
+    },
   });
-
   if (!card) throw new Error('Card not found');
 
-  const links = await prisma.issuerEstablishment.findMany({
-    where: { issuerId: card.issuerId },
-    include: { establishment: true },
-    orderBy: { establishment: { name: 'asc' } },
-  });
-
-  return links.map((link) => ({
-    id: link.establishment.id,
-    name: link.establishment.name,
-    nameHe: link.establishment.nameHe,
-    logoUrl: link.establishment.logoUrl,
-    type: link.type,
-    notes: link.notes,
-  }));
+  return card.cardProduct.stores
+    .map((s) => ({
+      id: s.store.id,
+      name: s.store.name,
+      category: s.store.category,
+      websiteUrl: s.store.websiteUrl,
+      type: s.type,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 };
 

@@ -1,99 +1,80 @@
-import { PrismaClient, CardStatus } from '@prisma/client';
+import { PrismaClient, UserCardStatus } from '@prisma/client';
 import { encrypt, decrypt } from '../utils/encryption';
 
 const prisma = new PrismaClient();
 
 export interface CreateCardData {
   userId: string;
-  issuerId: string;
-  label: string;
-  labelHe?: string;
+  cardProductId: string;
+  nickname?: string;
+  balance?: number;
+  expiresAt?: Date;
   codeLast4: string;
   fullCode?: string;
-  valueInitial: number;
-  valueCurrent: number;
-  notes?: string;
-  photoUrl?: string;
 }
 
 export const createCard = async (data: CreateCardData) => {
   const {
     userId,
-    issuerId,
-    label,
-    labelHe,
+    cardProductId,
+    nickname,
+    balance,
+    expiresAt,
     codeLast4,
     fullCode,
-    valueInitial,
-    valueCurrent,
-    notes,
-    photoUrl,
   } = data;
 
-  // Validate valueCurrent <= valueInitial
-  if (valueCurrent > valueInitial) {
-    throw new Error('Current value cannot exceed initial value');
+  const product = await prisma.cardProduct.findUnique({
+    where: { id: cardProductId },
+    select: { id: true },
+  });
+  if (!product) {
+    throw new Error('CardProduct not found');
   }
 
   // Encrypt full code if provided
   const encryptedCode = fullCode ? encrypt(fullCode.replace(/\s/g, '')) : null;
 
   // Create card
-  const card = await prisma.card.create({
+  const card = await prisma.userCard.create({
     data: {
       userId,
-      issuerId,
-      label,
-      labelHe,
+      cardProductId,
+      nickname,
+      balance: balance ?? 0,
+      expiresAt,
       codeLast4,
       fullCode: encryptedCode,
-      valueInitial,
-      valueCurrent,
-      currency: 'ILS',
-      status: CardStatus.active,
-      notes,
-      photoUrl,
+      status: UserCardStatus.active,
     },
     include: {
-      issuer: true,
+      cardProduct: {
+        include: { issuer: true },
+      },
     },
   });
 
   return card;
 };
 
-export const getCardsByUser = async (userId: string, filters?: { status?: CardStatus; issuerId?: string }) => {
-  const where: any = { userId };
-
-  if (filters?.status) {
-    where.status = filters.status;
-  }
-
-  if (filters?.issuerId) {
-    where.issuerId = filters.issuerId;
-  }
-
-  const cards = await prisma.card.findMany({
-    where,
+export const getCardsByUser = async (userId: string) => {
+  return prisma.userCard.findMany({
+    where: { userId },
     include: {
-      issuer: true,
+      cardProduct: { include: { issuer: true } },
     },
-    orderBy: {
-      createdAt: 'desc',
-    },
+    orderBy: { createdAt: 'desc' },
   });
-
-  return cards;
 };
 
 export const getCardById = async (cardId: string, userId: string) => {
-  const card = await prisma.card.findFirst({
+  const card = await prisma.userCard.findFirst({
     where: {
       id: cardId,
       userId,
     },
     include: {
-      issuer: true,
+      cardProduct: { include: { issuer: true } },
     },
   });
 
@@ -105,7 +86,7 @@ export const getCardById = async (cardId: string, userId: string) => {
 };
 
 export const markAsUsed = async (cardId: string, userId: string) => {
-  const card = await prisma.card.findFirst({
+  const card = await prisma.userCard.findFirst({
     where: {
       id: cardId,
       userId,
@@ -116,15 +97,14 @@ export const markAsUsed = async (cardId: string, userId: string) => {
     throw new Error('Card not found');
   }
 
-  // Update card
-  const updated = await prisma.card.update({
+  const updated = await prisma.userCard.update({
     where: { id: cardId },
     data: {
-      valueCurrent: 0,
-      status: CardStatus.used,
+      balance: 0,
+      status: UserCardStatus.used,
     },
     include: {
-      issuer: true,
+      cardProduct: { include: { issuer: true } },
     },
   });
 
@@ -132,7 +112,7 @@ export const markAsUsed = async (cardId: string, userId: string) => {
 };
 
 export const deleteCard = async (cardId: string, userId: string) => {
-  const card = await prisma.card.findFirst({
+  const card = await prisma.userCard.findFirst({
     where: {
       id: cardId,
       userId,
@@ -143,7 +123,7 @@ export const deleteCard = async (cardId: string, userId: string) => {
     throw new Error('Card not found');
   }
 
-  await prisma.card.delete({
+  await prisma.userCard.delete({
     where: { id: cardId },
   });
 
@@ -151,7 +131,7 @@ export const deleteCard = async (cardId: string, userId: string) => {
 };
 
 export const getCardFullCode = async (cardId: string, userId: string) => {
-  const card = await prisma.card.findFirst({
+  const card = await prisma.userCard.findFirst({
     where: {
       id: cardId,
       userId,

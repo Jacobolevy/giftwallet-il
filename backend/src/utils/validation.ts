@@ -31,13 +31,14 @@ export const validateLogin: ValidationChain[] = [
 ];
 
 export const validateCard: ValidationChain[] = [
-  body('issuerId')
+  body('cardProductId')
     .isUUID()
-    .withMessage('Valid issuer ID is required'),
-  body('label')
+    .withMessage('Valid cardProductId is required'),
+  body('nickname')
+    .optional()
     .trim()
-    .isLength({ min: 1, max: 50 })
-    .withMessage('Label must be between 1 and 50 characters'),
+    .isLength({ max: 100 })
+    .withMessage('Nickname must be less than 100 characters'),
   body('codeLast4')
     .matches(/^\d{4}$/)
     .withMessage('Last 4 digits must be exactly 4 numbers'),
@@ -45,12 +46,15 @@ export const validateCard: ValidationChain[] = [
     .optional()
     .matches(/^[\d\s]+$/)
     .withMessage('Card code must contain only digits and spaces'),
-  body('valueInitial')
-    .isFloat({ min: 0.01 })
-    .withMessage('Initial value must be greater than 0'),
-  body('valueCurrent')
+  body('balance')
+    .optional()
     .isFloat({ min: 0 })
-    .withMessage('Current value cannot be negative'),
+    .withMessage('Balance cannot be negative'),
+  body('expiresAt')
+    .optional()
+    .isISO8601()
+    .toDate()
+    .withMessage('expiresAt must be a valid ISO8601 date'),
   body('notes')
     .optional()
     .trim()
