@@ -10,8 +10,14 @@ export const metadata: Metadata = {
   title: 'GiftWallet IL - Manage Your Gift Cards',
   description: 'Manage all your Israeli gift cards in one place',
   manifest: '/manifest.json',
+  icons: [{ rel: 'icon', url: '/icon.svg', type: 'image/svg+xml' }],
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
   themeColor: '#2563eb',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
 };
 
 export default function RootLayout({
