@@ -7,6 +7,8 @@ interface User {
   name?: string;
   phone?: string;
   languagePreference: 'he' | 'en';
+  emailNotificationsEnabled?: boolean;
+  pushNotificationsEnabled?: boolean;
 }
 
 interface AuthState {
