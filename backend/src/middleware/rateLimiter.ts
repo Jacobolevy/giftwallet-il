@@ -17,8 +17,8 @@ export const apiRateLimiter = rateLimit({
 });
 
 export const signupRateLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3, // 3 signups per hour
+  windowMs: parseInt(process.env.SIGNUP_RATE_LIMIT_WINDOW_MS || '3600000'), // 1 hour default
+  max: parseInt(process.env.SIGNUP_RATE_LIMIT_MAX || '10'), // 10 signups per hour
   message: 'Too many signup attempts, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
