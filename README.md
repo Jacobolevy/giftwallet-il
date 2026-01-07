@@ -1,16 +1,12 @@
-# GiftWallet IL - Gift Card Wallet App
+# GiftWallet IL — MVP (Issuer → CardProduct → Store → UserCard)
 
-A bilingual (Hebrew/English) mobile-friendly web application for Israeli users to manage gift cards from multiple issuers in one unified wallet.
+GiftWallet IL is a web MVP (Next.js + Express + Prisma/PostgreSQL) for Israeli gift cards.
 
-## 🎯 Features
-
-- 📱 Store all gift cards in one place with visual card representations
-- 💰 Track balances and expiry dates with quick update options
-- 🔔 Automatic reminders before cards expire
-- 🏢 Support for BuyMe, Max, Dreamcard, Tav Tzahav, and other issuers
-- 🌐 Bilingual support (Hebrew/English) with RTL layout
-- 📊 Statistics and insights dashboard
-- 🔒 Secure encryption for sensitive card data
+Core value:
+- Users store their **UserCards**
+- Each UserCard points to a **CardProduct** (a specific “sub-card” under an Issuer)
+- CardProducts define exactly **which Stores** accept them
+- Users can search a store and see **only stores where they can spend** (sum of balances > 0)
 
 ## 🚀 Quick Start
 
@@ -46,7 +42,7 @@ cp frontend/.env.example frontend/.env.local
 npm run db:migrate
 ```
 
-6. Seed initial data (issuers):
+6. Seed initial data (issuers, card products, stores, mappings):
 ```bash
 npm run db:seed
 ```
@@ -72,7 +68,6 @@ giftwallet-il/
 │   │   ├── middleware/
 │   │   └── utils/
 │   ├── prisma/       # Database schema & migrations
-│   └── jobs/         # Scheduled tasks
 ├── frontend/         # Next.js React app
 │   ├── app/          # Next.js app directory
 │   ├── components/   # React components
@@ -87,13 +82,14 @@ giftwallet-il/
 See `backend/prisma/schema.prisma` for the complete database schema.
 
 ### Main Tables:
-- **Users** - User accounts and preferences
-- **Issuers** - Gift card issuers (BuyMe, Max, etc.)
-- **GiftCards** - User's gift cards
-- **Reminders** - Expiry reminders
-- **BalanceHistory** - Balance change tracking
+- **users** - User accounts
+- **issuers** - Issuers (e.g. BuyMe, Max, Dreamcard)
+- **card_products** - Issuer sub-products that define store compatibility
+- **stores** - Stores
+- **card_product_stores** - Many-to-many mapping (CardProduct ↔ Store)
+- **user_cards** - User-owned cards with balance, optional expiry, encrypted full code
 
-## 🔐 Security Features
+## 🔐 Security
 
 - Password hashing with bcrypt
 - JWT-based authentication
@@ -101,38 +97,50 @@ See `backend/prisma/schema.prisma` for the complete database schema.
 - Input validation and sanitization
 - Rate limiting
 - CORS protection
-- CSRF tokens
-
-## 🌐 Bilingual Support
-
-The app supports Hebrew and English with:
-- Full UI translations
-- RTL layout for Hebrew
-- Language preference per user
-- Translated email notifications
-
-## 📧 Email Notifications
-
-Automatic reminders are sent:
-- 30 days before expiry
-- 7 days before expiry
-
-Configure email settings in `backend/.env`:
-```
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
-```
 
 ## 🧪 Testing
 
 Run the test suite:
 ```bash
-npm test
+cd backend && npm test
 ```
 
-See `docs/TESTING.md` for comprehensive test scenarios.
+Tests are **unit tests** with mocked Prisma (no Postgres required).
+
+## 🔌 API (MVP)
+
+Auth:
+- `POST /api/v1/auth/signup`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
+
+Cards (UserCard):
+- `GET /api/v1/cards`
+- `POST /api/v1/cards`
+- `GET /api/v1/cards/:id`
+- `DELETE /api/v1/cards/:id`
+- `POST /api/v1/cards/:id/mark-used`
+- `GET /api/v1/cards/:id/full-code`
+- `GET /api/v1/cards/:id/establishments` (stores for the card’s CardProduct)
+
+Stores (“establishments”):
+- `GET /api/v1/establishments/search?q=...`  
+  Returns **only stores where the user has total balance > 0**.
+- `GET /api/v1/establishments/:id/my-cards`  
+  Returns `{ store, totalAmount, cards[] }`.
+
+## 🔎 How search works (backend)
+
+1. Load user’s **active UserCards** with `balance > 0`
+2. Expand each UserCard’s `cardProduct.stores`
+3. Group by store, compute `totalAmount`
+4. Filter by `q` match and return only stores where `totalAmount > 0`
+
+## 🧨 Breaking changes (important)
+
+- Schema changed completely: old `Card/Establishment` relations were replaced by `Issuer/CardProduct/Store/UserCard`.
+- Removed non-MVP features: password reset/refresh, reminders, stats, profile/edit/export.
+- Requires a new migration (likely a reset if you had data).
 
 ## 📱 Progressive Web App
 
