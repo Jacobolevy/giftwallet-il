@@ -68,7 +68,7 @@ export const getReminders = async (req: AuthRequest, res: Response): Promise<voi
     });
 
     const pending = reminders.filter(r => !r.sentFlag).length;
-    const sent = reminders.filter(r => r.sentFlag).length;
+    const sentCount = reminders.filter(r => r.sentFlag).length;
     const upcoming7Days = reminders.filter(r => {
       const days = differenceInDays(r.reminderDate, new Date());
       return days >= 0 && days <= 7 && !r.sentFlag;
@@ -79,7 +79,7 @@ export const getReminders = async (req: AuthRequest, res: Response): Promise<voi
       summary: {
         total: reminders.length,
         pending,
-        sent,
+        sent: sentCount,
         upcoming_7_days: upcoming7Days,
       },
     });

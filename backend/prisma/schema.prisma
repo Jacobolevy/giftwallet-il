@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -62,7 +62,7 @@ model Issuer {
   brandColor      String?  @map("brand_color")
   supportPhone    String?  @map("support_phone")
   supportEmail    String?  @map("support_email")
-  notes           String?  @db.Text
+  notes           String?
   apiEndpoint     String?  @map("api_endpoint")
   balanceCheckUrl String?  @map("balance_check_url")
   createdAt       DateTime @default(now()) @map("created_at")
@@ -78,14 +78,14 @@ model GiftCard {
   issuerId          String     @map("issuer_id")
   label             String
   labelHe           String?    @map("label_he")
-  codeLast4         String     @map("code_last4") @db.VarChar(4)
+  codeLast4         String     @map("code_last4")
   fullCode          String?    @map("full_code") // Encrypted
-  valueInitial      Decimal    @map("value_initial") @db.Decimal(10, 2)
-  valueCurrent      Decimal    @map("value_current") @db.Decimal(10, 2)
+  valueInitial      Float      @map("value_initial")
+  valueCurrent      Float      @map("value_current")
   currency          String     @default("ILS")
-  expiryDate        DateTime   @map("expiry_date") @db.Date
+  expiryDate        DateTime   @map("expiry_date")
   status            CardStatus @default(active)
-  notes             String?    @db.Text
+  notes             String?
   photoUrl          String?    @map("photo_url")
   lastBalanceUpdate DateTime?  @map("last_balance_update")
   createdAt         DateTime   @default(now()) @map("created_at")
@@ -103,7 +103,7 @@ model Reminder {
   id          String       @id @default(uuid())
   userId      String       @map("user_id")
   giftcardId  String       @map("giftcard_id")
-  reminderDate DateTime    @map("reminder_date") @db.Date
+  reminderDate DateTime    @map("reminder_date")
   type        ReminderType
   sentFlag    Boolean      @default(false) @map("sent_flag")
   sentAt      DateTime?    @map("sent_at")
@@ -118,9 +118,9 @@ model Reminder {
 model BalanceHistory {
   id             String     @id @default(uuid())
   giftcardId     String     @map("giftcard_id")
-  previousBalance Decimal   @map("previous_balance") @db.Decimal(10, 2)
-  newBalance     Decimal    @map("new_balance") @db.Decimal(10, 2)
-  changeAmount   Decimal    @map("change_amount") @db.Decimal(10, 2)
+  previousBalance Float     @map("previous_balance")
+  newBalance     Float      @map("new_balance")
+  changeAmount   Float      @map("change_amount")
   changeType     ChangeType @map("change_type")
   notes          String?
   createdAt      DateTime   @default(now()) @map("created_at")

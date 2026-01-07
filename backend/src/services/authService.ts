@@ -55,7 +55,7 @@ export const signup = async (data: SignupData) => {
   const token = jwt.sign(
     { userId: user.id },
     process.env.JWT_SECRET!,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'] }
   );
 
   return { user, token };
@@ -84,7 +84,7 @@ export const login = async (data: LoginData) => {
   const token = jwt.sign(
     { userId: user.id },
     process.env.JWT_SECRET!,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'] }
   );
 
   return {
