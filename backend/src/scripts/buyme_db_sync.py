@@ -224,6 +224,7 @@ class BuyMeDBSyncer:
         """
         Scrape stores/businesses where a Buyme product can be redeemed.
         Returns normalized, deduplicated store names.
+        Handles lazy loading by scrolling until no new content loads.
         """
         logger.info(f"Scraping stores from {product_url}")
         
@@ -231,34 +232,134 @@ class BuyMeDBSyncer:
         
         try:
             self.driver.get(product_url)
-            time.sleep(3)
+            time.sleep(4)
             
-            # Scroll to load all content
-            for _ in range(3):
+            # Aggressive scrolling to load ALL stores (handles lazy loading)
+            # Keep scrolling until no new content is loaded
+            last_height = 0
+            scroll_attempts = 0
+            max_scroll_attempts = 100  # Safety limit for pages with 1000+ items
+            
+            logger.info("  Scrolling to load all stores (lazy loading)...")
+            
+            while scroll_attempts < max_scroll_attempts:
+                # Scroll down
                 self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(1)
+                time.sleep(1.5)  # Wait for content to load
+                
+                # Get new scroll height
+                new_height = self.driver.execute_script("return document.body.scrollHeight")
+                
+                # Check if we've reached the bottom
+                if new_height == last_height:
+                    # Try scrolling a bit more to trigger any remaining lazy loads
+                    self.driver.execute_script("window.scrollBy(0, 500);")
+                    time.sleep(1)
+                    final_height = self.driver.execute_script("return document.body.scrollHeight")
+                    if final_height == new_height:
+                        logger.info(f"  Finished scrolling after {scroll_attempts} scrolls")
+                        break
+                
+                last_height = new_height
+                scroll_attempts += 1
+                
+                # Log progress every 10 scrolls
+                if scroll_attempts % 10 == 0:
+                    # Count current stores found
+                    current_count = len(self.driver.find_elements(By.CSS_SELECTOR, 'a[href*="/supplier/"], [class*="store"], [class*="business"], [class*="brand"]'))
+                    logger.info(f"  Scroll {scroll_attempts}: found ~{current_count} elements so far...")
             
-            # Method 1: Look for specific sections about redemption locations
-            redemption_selectors = [
-                '[class*="redeem"]',
-                '[class*="location"]',
+            # Scroll back to top and then down again to ensure all content is rendered
+            self.driver.execute_script("window.scrollTo(0, 0);")
+            time.sleep(1)
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(2)
+            
+            # Method 1: Look for supplier/brand links (most reliable for BuyMe)
+            try:
+                supplier_links = self.driver.find_elements(By.CSS_SELECTOR, 'a[href*="/supplier/"]')
+                for link in supplier_links:
+                    try:
+                        # Get name from image alt
+                        imgs = link.find_elements(By.TAG_NAME, 'img')
+                        for img in imgs:
+                            alt = img.get_attribute('alt')
+                            if alt and alt.strip() and not alt.lower().startswith('buyme'):
+                                raw_stores.add(alt.strip())
+                        
+                        # Get name from link text
+                        text = link.text.strip()
+                        if text and len(text) < 100 and not text.lower().startswith('buyme'):
+                            # Split multi-line text and take first meaningful line
+                            lines = [l.strip() for l in text.split('\n') if l.strip()]
+                            for line in lines:
+                                if len(line) > 2 and len(line) < 80 and not line.lower().startswith('buyme'):
+                                    raw_stores.add(line)
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+            
+            # Method 2: Look for brand links
+            try:
+                brand_links = self.driver.find_elements(By.CSS_SELECTOR, 'a[href*="/brands/"]')
+                for link in brand_links:
+                    try:
+                        imgs = link.find_elements(By.TAG_NAME, 'img')
+                        for img in imgs:
+                            alt = img.get_attribute('alt')
+                            if alt and alt.strip() and not alt.lower().startswith('buyme'):
+                                raw_stores.add(alt.strip())
+                        
+                        text = link.text.strip()
+                        if text and len(text) < 100 and not text.lower().startswith('buyme'):
+                            lines = [l.strip() for l in text.split('\n') if l.strip()]
+                            for line in lines:
+                                if len(line) > 2 and len(line) < 80 and not line.lower().startswith('buyme'):
+                                    raw_stores.add(line)
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+            
+            # Method 3: Look for card/tile elements with store info
+            card_selectors = [
+                '[class*="card"]',
+                '[class*="tile"]',
+                '[class*="item"]',
                 '[class*="store"]',
-                '[class*="branch"]',
                 '[class*="business"]',
+                '[class*="brand"]',
                 '[class*="partner"]',
             ]
             
-            for selector in redemption_selectors:
+            for selector in card_selectors:
                 try:
                     elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
                     for element in elements:
-                        text = element.text.strip()
-                        if text and len(text) < 100 and not text.lower().startswith('buyme'):
-                            raw_stores.add(text)
+                        # Look for name in headings within the card
+                        try:
+                            headings = element.find_elements(By.CSS_SELECTOR, 'h1, h2, h3, h4, h5, h6, .title, .name')
+                            for heading in headings:
+                                text = heading.text.strip()
+                                if text and len(text) > 2 and len(text) < 80 and not text.lower().startswith('buyme'):
+                                    raw_stores.add(text)
+                        except Exception:
+                            pass
+                        
+                        # Look for name in image alt
+                        try:
+                            imgs = element.find_elements(By.TAG_NAME, 'img')
+                            for img in imgs:
+                                alt = img.get_attribute('alt')
+                                if alt and alt.strip() and len(alt) > 2 and len(alt) < 80 and not alt.lower().startswith('buyme'):
+                                    raw_stores.add(alt.strip())
+                        except Exception:
+                            pass
                 except Exception:
                     continue
             
-            # Method 2: Look for lists of businesses
+            # Method 4: Look for lists of businesses
             try:
                 list_items = self.driver.find_elements(By.CSS_SELECTOR, 'ul li, ol li')
                 for item in list_items:
@@ -273,40 +374,41 @@ class BuyMeDBSyncer:
             except Exception:
                 pass
             
-            # Method 3: Look for headings that might be store names
+            # Method 5: Look for any image with meaningful alt text (store logos)
             try:
-                headings = self.driver.find_elements(By.CSS_SELECTOR, 'h3, h4, h5, h6')
-                for heading in headings:
-                    text = heading.text.strip()
-                    if (text and 
-                        len(text) < 60 and 
-                        len(text) > 2 and
-                        not text.lower().startswith('buyme')):
-                        raw_stores.add(text)
-            except Exception:
-                pass
-            
-            # Method 4: Look for links to external store websites
-            try:
-                external_links = self.driver.find_elements(By.CSS_SELECTOR, 'a[target="_blank"]')
-                for link in external_links:
-                    text = link.text.strip()
-                    if (text and 
-                        len(text) < 60 and 
-                        len(text) > 2 and
-                        not text.lower().startswith('buyme') and
-                        not text.startswith('http')):
-                        raw_stores.add(text)
+                all_images = self.driver.find_elements(By.TAG_NAME, 'img')
+                for img in all_images:
+                    alt = img.get_attribute('alt')
+                    if (alt and 
+                        len(alt.strip()) > 2 and 
+                        len(alt.strip()) < 80 and 
+                        not alt.lower().startswith('buyme') and
+                        not alt.lower() in ['logo', 'icon', 'image', 'photo']):
+                        raw_stores.add(alt.strip())
             except Exception:
                 pass
             
             # Clean up and deduplicate stores
             non_stores = {
-                'חזרה', 'הבא', 'קודם', 'סגור', 'פתח', 'הוסף', 'קנה',
-                'שתף', 'share', 'close', 'next', 'prev', 'back',
+                # Navigation
+                'חזרה', 'הבא', 'קודם', 'סגור', 'פתח', 'הוסף', 'קנה', 'חיפוש',
+                'שתף', 'share', 'close', 'next', 'prev', 'back', 'search',
+                # Footer/Legal
                 'תנאי שימוש', 'מדיניות פרטיות', 'צור קשר', 'אודות',
                 'terms', 'privacy', 'contact', 'about', 'home', 'menu',
+                # Page sections
                 'איפה אפשר לממש', 'מידע נוסף', 'תיאור', 'פרטים',
+                'הוראות מימוש בבית העסק', 'בתי עסק מכבדים',
+                # Categories (from BuyMe)
+                'תינוקות וילדים', 'לבית', 'תרבות ופנאי', 'לגוף ולנפש',
+                'סדנאות והעשרה', 'מלונות ונופש', 'חוויות', 'ספא וימי כיף',
+                'מסעדות וקולינריה', 'מחבקים מילואימניקים', 'חדש על המדף',
+                'אופנה', 'יופי וטיפוח', 'טכנולוגיה', 'ספורט',
+                # UI elements
+                'מימוש אונליין', 'אזור', 'סנן', 'filter', 'area',
+                'logo', 'icon', 'image', 'photo', 'arrow',
+                # Generic
+                'עוד', 'more', 'all', 'הכל', 'ראה עוד', 'see more',
             }
             
             # Deduplicate using normalized names
