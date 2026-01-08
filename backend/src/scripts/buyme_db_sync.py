@@ -1,6 +1,6 @@
 # buyme_db_sync.py
 # Scrapes BuyMe gift card products (starting with "Buyme") and their accepted stores
-# Syncs directly to PostgreSQL
+# Syncs directly to PostgreSQL with deduplication
 
 import os
 import json
@@ -8,8 +8,9 @@ import time
 import uuid
 import logging
 import re
+import unicodedata
 from datetime import datetime
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Set, Tuple, Optional
 import psycopg2
 from psycopg2.extras import execute_values
 from selenium import webdriver
@@ -33,13 +34,10 @@ class BuyMeDBSyncer:
     (e.g., Buyme Chef, Buyme Fashion, Buyme Digital, etc.)
     and their accepted stores, then syncs to PostgreSQL.
     
-    This script:
-    1. Finds all gift card products (suppliers) starting with "Buyme"
-    2. For each Buyme product, scrapes the stores where it can be redeemed
-    3. Upserts CardProducts (Buyme gift cards) in the database
-    4. Upserts Stores (businesses) in the database
-    5. Links them via CardProductStore
-    6. Removes outdated links for stores no longer listed
+    Features:
+    - Deduplication: Stores are normalized and matched to avoid duplicates
+    - Case-insensitive matching for store names
+    - Shared stores across multiple Buyme products are linked correctly
     """
     
     ISSUER_ID = 'buyme'  # Must match your DB issuer ID
@@ -49,6 +47,49 @@ class BuyMeDBSyncer:
         self.base_url = "https://buyme.co.il"
         self.driver = None
         self.conn = None
+        # Cache for store names -> store IDs (to avoid duplicate DB queries)
+        self.store_cache: Dict[str, str] = {}  # normalized_name -> store_id
+        
+    def normalize_store_name(self, name: str) -> str:
+        """
+        Normalize store name for comparison and deduplication.
+        - Lowercase
+        - Remove extra whitespace
+        - Remove special characters
+        - Normalize unicode characters
+        """
+        if not name:
+            return ""
+        
+        # Normalize unicode (e.g., different types of spaces, dashes)
+        name = unicodedata.normalize('NFKC', name)
+        
+        # Lowercase
+        name = name.lower()
+        
+        # Remove extra whitespace
+        name = ' '.join(name.split())
+        
+        # Remove common suffixes/prefixes that might vary
+        name = name.strip()
+        
+        return name
+    
+    def get_display_name(self, name: str) -> str:
+        """
+        Get a clean display name for a store.
+        Keeps proper capitalization but cleans up whitespace.
+        """
+        if not name:
+            return ""
+        
+        # Normalize unicode
+        name = unicodedata.normalize('NFKC', name)
+        
+        # Remove extra whitespace
+        name = ' '.join(name.split())
+        
+        return name.strip()
         
     def connect_db(self):
         """Connect to PostgreSQL database."""
@@ -84,6 +125,21 @@ class BuyMeDBSyncer:
         if self.driver:
             self.driver.quit()
             logger.info("WebDriver closed")
+    
+    def load_existing_stores(self):
+        """
+        Load all existing stores from database into cache.
+        This allows us to match stores across different Buyme products.
+        """
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute("SELECT id, name FROM stores")
+            for store_id, name in cursor.fetchall():
+                normalized = self.normalize_store_name(name)
+                self.store_cache[normalized] = store_id
+            logger.info(f"Loaded {len(self.store_cache)} existing stores into cache")
+        finally:
+            cursor.close()
     
     def discover_buyme_products(self) -> Dict[str, str]:
         """
@@ -141,9 +197,14 @@ class BuyMeDBSyncer:
                             
                             # Check if it starts with "Buyme" (case-insensitive)
                             if supplier_name and supplier_name.lower().startswith(self.BUYME_PREFIX):
-                                if supplier_name not in buyme_products:
-                                    buyme_products[supplier_name] = supplier_url
-                                    logger.info(f"Found Buyme product: {supplier_name}")
+                                # Normalize the product name for consistency
+                                clean_name = self.get_display_name(supplier_name)
+                                normalized = self.normalize_store_name(clean_name)
+                                
+                                # Avoid duplicate products
+                                if normalized not in [self.normalize_store_name(k) for k in buyme_products.keys()]:
+                                    buyme_products[clean_name] = supplier_url
+                                    logger.info(f"Found Buyme product: {clean_name}")
                                     
                         except Exception:
                             continue
@@ -162,16 +223,11 @@ class BuyMeDBSyncer:
     def scrape_stores_from_product(self, product_url: str) -> Set[str]:
         """
         Scrape stores/businesses where a Buyme product can be redeemed.
-        
-        Args:
-            product_url: URL of the Buyme product page
-            
-        Returns:
-            Set of store names where the product can be used
+        Returns normalized, deduplicated store names.
         """
         logger.info(f"Scraping stores from {product_url}")
         
-        stores = set()
+        raw_stores = set()
         
         try:
             self.driver.get(product_url)
@@ -181,9 +237,6 @@ class BuyMeDBSyncer:
             for _ in range(3):
                 self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 time.sleep(1)
-            
-            # Look for store/business names in various elements
-            # BuyMe typically shows "איפה אפשר לממש" (Where can you redeem)
             
             # Method 1: Look for specific sections about redemption locations
             redemption_selectors = [
@@ -201,7 +254,7 @@ class BuyMeDBSyncer:
                     for element in elements:
                         text = element.text.strip()
                         if text and len(text) < 100 and not text.lower().startswith('buyme'):
-                            stores.add(text)
+                            raw_stores.add(text)
                 except Exception:
                     continue
             
@@ -210,14 +263,13 @@ class BuyMeDBSyncer:
                 list_items = self.driver.find_elements(By.CSS_SELECTOR, 'ul li, ol li')
                 for item in list_items:
                     text = item.text.strip()
-                    # Filter out navigation items, prices, etc.
                     if (text and 
                         len(text) < 80 and 
                         len(text) > 2 and
                         not text.lower().startswith('buyme') and
-                        not re.match(r'^[\d₪\s\.,]+$', text) and  # Not just numbers/prices
+                        not re.match(r'^[\d₪\s\.,]+$', text) and
                         not text.startswith('http')):
-                        stores.add(text)
+                        raw_stores.add(text)
             except Exception:
                 pass
             
@@ -230,7 +282,7 @@ class BuyMeDBSyncer:
                         len(text) < 60 and 
                         len(text) > 2 and
                         not text.lower().startswith('buyme')):
-                        stores.add(text)
+                        raw_stores.add(text)
             except Exception:
                 pass
             
@@ -244,21 +296,40 @@ class BuyMeDBSyncer:
                         len(text) > 2 and
                         not text.lower().startswith('buyme') and
                         not text.startswith('http')):
-                        stores.add(text)
+                        raw_stores.add(text)
             except Exception:
                 pass
             
-            # Clean up stores - remove common non-store items
+            # Clean up and deduplicate stores
             non_stores = {
                 'חזרה', 'הבא', 'קודם', 'סגור', 'פתח', 'הוסף', 'קנה',
                 'שתף', 'share', 'close', 'next', 'prev', 'back',
                 'תנאי שימוש', 'מדיניות פרטיות', 'צור קשר', 'אודות',
-                'terms', 'privacy', 'contact', 'about',
+                'terms', 'privacy', 'contact', 'about', 'home', 'menu',
+                'איפה אפשר לממש', 'מידע נוסף', 'תיאור', 'פרטים',
             }
-            stores = {s for s in stores if s.lower() not in non_stores}
             
-            logger.info(f"Found {len(stores)} stores")
-            return stores
+            # Deduplicate using normalized names
+            seen_normalized = set()
+            clean_stores = set()
+            
+            for store in raw_stores:
+                clean = self.get_display_name(store)
+                normalized = self.normalize_store_name(clean)
+                
+                # Skip non-store items and duplicates
+                if normalized in non_stores or normalized in seen_normalized:
+                    continue
+                    
+                # Skip very short or empty names
+                if len(normalized) < 2:
+                    continue
+                
+                seen_normalized.add(normalized)
+                clean_stores.add(clean)
+            
+            logger.info(f"Found {len(clean_stores)} unique stores")
+            return clean_stores
             
         except Exception as e:
             logger.error(f"Error scraping product {product_url}: {e}")
@@ -278,12 +349,58 @@ class BuyMeDBSyncer:
         finally:
             cursor.close()
 
+    def get_or_create_store(self, cursor, store_name: str) -> str:
+        """
+        Get existing store ID or create new store.
+        Uses cache to avoid duplicates across different Buyme products.
+        
+        Returns:
+            Store ID
+        """
+        clean_name = self.get_display_name(store_name)
+        normalized = self.normalize_store_name(clean_name)
+        
+        # Check cache first
+        if normalized in self.store_cache:
+            return self.store_cache[normalized]
+        
+        # Check database (in case cache missed it)
+        cursor.execute("""
+            SELECT id, name FROM stores WHERE LOWER(TRIM(name)) = LOWER(TRIM(%s))
+        """, (clean_name,))
+        
+        result = cursor.fetchone()
+        
+        if result:
+            store_id = result[0]
+            self.store_cache[normalized] = store_id
+            return store_id
+        
+        # Also try normalized comparison
+        cursor.execute("SELECT id, name FROM stores")
+        for existing_id, existing_name in cursor.fetchall():
+            if self.normalize_store_name(existing_name) == normalized:
+                self.store_cache[normalized] = existing_id
+                return existing_id
+        
+        # Create new store
+        store_id = str(uuid.uuid4())
+        cursor.execute("""
+            INSERT INTO stores (id, name)
+            VALUES (%s, %s)
+        """, (store_id, clean_name))
+        
+        self.store_cache[normalized] = store_id
+        logger.info(f"  + Created new store: {clean_name}")
+        
+        return store_id
+
     def sync_to_database(self, scraped_data: Dict):
         """
         Sync scraped data to PostgreSQL database.
         
         - Upserts CardProducts (Buyme gift cards)
-        - Upserts Stores (businesses)  
+        - Upserts Stores (businesses) with deduplication
         - Creates CardProductStore links
         - Removes outdated links
         """
@@ -311,26 +428,9 @@ class BuyMeDBSyncer:
                 
                 active_store_ids = []
                 
-                # 2. Upsert Stores and link them
+                # 2. Get or create stores and link them
                 for store_name in stores:
-                    # Find existing store (case-insensitive)
-                    cursor.execute("""
-                        SELECT id FROM stores WHERE LOWER(name) = LOWER(%s)
-                    """, (store_name,))
-                    
-                    store_result = cursor.fetchone()
-                    
-                    if store_result:
-                        store_id = store_result[0]
-                    else:
-                        # Create new store
-                        store_id = str(uuid.uuid4())
-                        cursor.execute("""
-                            INSERT INTO stores (id, name)
-                            VALUES (%s, %s)
-                        """, (store_id, store_name))
-                        logger.info(f"  + Created new store: {store_name}")
-                    
+                    store_id = self.get_or_create_store(cursor, store_name)
                     active_store_ids.append(store_id)
                     
                     # Link store to card product
@@ -350,7 +450,6 @@ class BuyMeDBSyncer:
                     if deleted > 0:
                         logger.info(f"  - Removed {deleted} outdated store links from {product_name}")
                 else:
-                    # No stores found, remove all links for this product
                     cursor.execute("""
                         DELETE FROM card_product_stores WHERE card_product_id = %s
                     """, (card_product_id,))
@@ -375,6 +474,9 @@ class BuyMeDBSyncer:
             self.setup_driver()
             self.connect_db()
             
+            # Load existing stores into cache for deduplication
+            self.load_existing_stores()
+            
             # Ensure issuer exists
             self.ensure_issuer_exists()
             
@@ -382,7 +484,6 @@ class BuyMeDBSyncer:
             buyme_products = self.discover_buyme_products()
             if not buyme_products:
                 logger.warning("No Buyme products found! Trying alternative approach...")
-                # Fallback: manually define known Buyme products
                 buyme_products = self.get_known_buyme_products()
             
             if not buyme_products:
@@ -404,11 +505,16 @@ class BuyMeDBSyncer:
             self.sync_to_database(scraped_data)
             
             # Summary
-            total_stores = sum(len(prod['stores']) for prod in scraped_data['products'].values())
+            total_store_links = sum(len(prod['stores']) for prod in scraped_data['products'].values())
+            unique_stores = len(self.store_cache)
+            
             logger.info("=" * 70)
             logger.info("SUMMARY:")
             logger.info(f"  Total Buyme products: {len(scraped_data['products'])}")
-            logger.info(f"  Total stores: {total_stores}")
+            logger.info(f"  Unique stores in DB: {unique_stores}")
+            logger.info(f"  Total store-product links: {total_store_links}")
+            logger.info("")
+            logger.info("  Products breakdown:")
             for product_name, product_info in scraped_data['products'].items():
                 logger.info(f"    - {product_name}: {len(product_info['stores'])} stores")
             logger.info("=" * 70)
@@ -425,11 +531,9 @@ class BuyMeDBSyncer:
     def get_known_buyme_products(self) -> Dict[str, str]:
         """
         Fallback method: Return known Buyme product URLs.
-        Update this list as new Buyme products are discovered.
         """
         logger.info("Using known Buyme products as fallback...")
         
-        # These are typical Buyme gift card products
         known_products = {
             "Buyme": f"{self.base_url}/supplier/buyme",
             "Buyme Chef": f"{self.base_url}/supplier/buyme-chef",
@@ -441,13 +545,11 @@ class BuyMeDBSyncer:
             "Buyme Experience": f"{self.base_url}/supplier/buyme-experience",
         }
         
-        # Verify which URLs actually exist
         valid_products = {}
         for name, url in known_products.items():
             try:
                 self.driver.get(url)
                 time.sleep(2)
-                # Check if page loaded successfully (not a 404)
                 if "404" not in self.driver.title.lower() and "not found" not in self.driver.page_source.lower():
                     valid_products[name] = url
                     logger.info(f"Verified Buyme product: {name}")
