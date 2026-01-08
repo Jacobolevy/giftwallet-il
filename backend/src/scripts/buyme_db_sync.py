@@ -81,47 +81,107 @@ class BuyMeDBSyncer:
     def _is_valid_store_name(self, name: str) -> bool:
         """
         Check if a name is a valid store name (not a category, UI element, etc.)
+        VERY STRICT filtering to avoid capturing garbage.
         """
-        if not name or len(name) < 2 or len(name) > 80:
+        if not name:
             return False
         
-        name_lower = name.lower().strip()
+        name = name.strip()
+        name_lower = name.lower()
         
-        # Skip if starts with Buyme (it's a product, not a store)
-        if name_lower.startswith('buyme'):
+        # Length checks
+        if len(name) < 2 or len(name) > 60:
             return False
         
-        # Skip category names (Hebrew)
-        categories = {
+        # Skip multi-line text (likely UI elements)
+        if '\n' in name:
+            return False
+        
+        # Skip if starts with Buyme/BUYME (it's a product, not a store)
+        if name_lower.startswith('buyme') or name_lower.startswith('buy me'):
+            return False
+        
+        # Skip emails
+        if '@' in name or 'mailto:' in name_lower:
+            return False
+        
+        # Skip phone numbers
+        if re.match(r'^[\d\-\s\(\)\+]+$', name):
+            return False
+        if re.match(r'^\d{2,3}[\-\s]?\d{7}$', name.replace(' ', '')):
+            return False
+        
+        # Skip URLs
+        if name.startswith('http') or name.startswith('www.') or '.co.il' in name_lower:
+            return False
+        
+        # Skip if it's mostly numbers/prices
+        if re.match(r'^[\d₪\s\.,\-\:]+$', name):
+            return False
+        
+        # Skip times/hours
+        if re.search(r'\d{1,2}:\d{2}', name):
+            return False
+        
+        # Skip copyright notices
+        if name.startswith('©') or name.startswith('Ⓒ') or 'copyright' in name_lower:
+            return False
+        
+        # Extensive blocklist
+        blocklist = {
+            # Categories
             'תינוקות וילדים', 'לבית', 'תרבות ופנאי', 'לגוף ולנפש',
             'סדנאות והעשרה', 'מלונות ונופש', 'חוויות', 'ספא וימי כיף',
             'מסעדות וקולינריה', 'מחבקים מילואימניקים', 'חדש על המדף',
             'אופנה', 'יופי וטיפוח', 'טכנולוגיה', 'ספורט', 'לילדים',
-            'מתנות', 'גיפט קארד', 'הכל', 'הצג הכל', 'עוד',
             'מסעדות', 'קולינריה', 'בתי קפה', 'ברים',
-        }
-        if name_lower in categories or name in categories:
-            return False
-        
-        # Skip UI elements
-        ui_elements = {
+            # Gift card categories  
+            'גיפט קארד', 'גיפט קארד לבתי ספא', 'גיפט קארד ליופי וטיפוח',
+            'גיפט קארד למותגי אופנה', 'גיפט קארד למתנות קולינריות',
+            'גיפט קארד לנופש ולמלונות', 'גיפט קארד לסדנאות והעשרה',
+            'גיפט קארד לתרבות ופנאי',
+            # Gift occasions (מתנות ל...)
+            'מתנות', 'הכל', 'הצג הכל', 'עוד',
+            # UI/Navigation
             'חיפוש', 'search', 'חזרה', 'back', 'הבא', 'next', 'קודם', 'prev',
             'סגור', 'close', 'פתח', 'open', 'שתף', 'share', 'menu', 'תפריט',
             'מימוש אונליין', 'אזור', 'סנן', 'filter', 'area', 'location',
-            'הוראות מימוש', 'תנאי שימוש', 'מדיניות פרטיות', 'צור קשר',
-            'בתי עסק מכבדים', 'בתי עסק', 'איפה אפשר לממש',
+            'הוראות מימוש', 'בתי עסק מכבדים', 'בתי עסק', 'איפה אפשר לממש',
             'logo', 'icon', 'image', 'photo', 'arrow', 'chevron',
+            # Footer/Legal
+            'תנאי שימוש', 'מדיניות פרטיות', 'מדיניות הגנת פרטיות', 'צור קשר',
+            'תקנון האתר', 'הצהרת נגישות', 'שאלות ותשובות', 'דברו איתנו',
+            'privacy policy', 'careers', 'terms', 'about', 'contact',
+            # Blog/Marketing
+            'בלוג', 'טיפים', 'רעיונות למתנות', 'המתנות האהובות', 'המתנות החדשות',
+            'רעיונות למתנות וחוויות', 'רעיונות למתנות מקוריות',
+            # Business pages
+            'חברות וארגונים', 'מתנות לעובדים', 'כניסת בתי עסק', 'שותפים',
+            'כל מה שחשוב',
+            # Promotions
+            'תקנון פעילות', 'תקנון מתנה משותפת',
+            # Networks/Chains
+            'רשתות',
+            # Family experiences
+            'חוויות משפחתיות',
         }
-        if name_lower in ui_elements or name in ui_elements:
+        
+        # Check exact match
+        if name in blocklist or name_lower in blocklist:
             return False
         
-        # Skip if it's just numbers or prices
-        if re.match(r'^[\d₪\s\.,\-]+$', name):
-            return False
+        # Check if starts with blocked prefix
+        blocked_prefixes = ['מתנות ל', 'מתנות ב', 'מתנות ס', 'מתנות ג', 'מתנות כ', 
+                          'מתנות מ', 'מתנות ת', 'רשתות ', 'תקנון ']
+        for prefix in blocked_prefixes:
+            if name.startswith(prefix):
+                return False
         
-        # Skip URLs
-        if name.startswith('http') or name.startswith('www.'):
-            return False
+        # Check if contains blocked words
+        blocked_words = ['תקנון', 'מדיניות', 'הצהרת', 'careers', 'privacy', 'copyright']
+        for word in blocked_words:
+            if word in name_lower:
+                return False
         
         return True
     
@@ -351,17 +411,45 @@ class BuyMeDBSyncer:
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(1)
             
-            # FOCUSED METHOD: Only look for store links in the main content area
-            # Stores on BuyMe are shown as links to /supplier/ pages with images
-            # We need to be VERY selective to avoid capturing UI elements
+            # TARGETED METHOD: Look for stores in the main content grid ONLY
+            # Exclude header, footer, sidebar, and navigation
             
-            # Get the current product's supplier ID to exclude it
+            # Get the current product's IDs to exclude it
             current_supplier_id = product_url.split('/supplier/')[-1].split('?')[0] if '/supplier/' in product_url else ''
             current_brand_id = product_url.split('/brands/')[-1].split('?')[0] if '/brands/' in product_url else ''
             
-            # Method 1: Look for supplier links that are NOT the current product
+            # Find the main store grid container (BuyMe uses specific classes)
+            main_content_selectors = [
+                '.brands-page__results',      # Main results container
+                '.brands-page__grid',          # Grid container
+                '[class*="results"]',          # Generic results
+                '[class*="grid"]',             # Generic grid
+                'main',                        # Main content area
+            ]
+            
+            main_container = None
+            for selector in main_content_selectors:
+                try:
+                    containers = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for container in containers:
+                        # Look for a container that has multiple supplier links
+                        links = container.find_elements(By.CSS_SELECTOR, 'a[href*="/supplier/"]')
+                        if len(links) > 5:  # Likely the store grid
+                            main_container = container
+                            break
+                    if main_container:
+                        break
+                except Exception:
+                    continue
+            
+            # If we found a main container, search within it; otherwise search the page but be very strict
+            search_context = main_container if main_container else self.driver
+            
+            # Look for supplier links (stores)
             try:
-                supplier_links = self.driver.find_elements(By.CSS_SELECTOR, 'a[href*="/supplier/"]')
+                supplier_links = search_context.find_elements(By.CSS_SELECTOR, 'a[href*="/supplier/"]')
+                logger.info(f"  Found {len(supplier_links)} supplier links to check")
+                
                 for link in supplier_links:
                     try:
                         href = link.get_attribute('href') or ''
@@ -370,12 +458,16 @@ class BuyMeDBSyncer:
                         if current_supplier_id and current_supplier_id in href:
                             continue
                         
-                        # Skip navigation/header links (usually have specific classes)
-                        parent_classes = link.get_attribute('class') or ''
-                        if any(x in parent_classes.lower() for x in ['nav', 'header', 'menu', 'footer']):
-                            continue
+                        # Skip links in header/footer/nav by checking ancestors
+                        try:
+                            # Get the link's location on page - footer/header links are usually at top or bottom
+                            location = link.location
+                            if location and location.get('y', 0) < 200:  # Likely header
+                                continue
+                        except Exception:
+                            pass
                         
-                        # Get store name from image alt (most reliable)
+                        # Get store name from image alt ONLY (most reliable, avoids text garbage)
                         store_name = None
                         imgs = link.find_elements(By.TAG_NAME, 'img')
                         for img in imgs:
@@ -384,35 +476,7 @@ class BuyMeDBSyncer:
                                 store_name = alt.strip()
                                 break
                         
-                        # Validate the store name
-                        if store_name and self._is_valid_store_name(store_name):
-                            raw_stores.add(store_name)
-                            
-                    except Exception:
-                        continue
-            except Exception:
-                pass
-            
-            # Method 2: Look for brand links (alternative URL pattern)
-            try:
-                brand_links = self.driver.find_elements(By.CSS_SELECTOR, 'a[href*="/brands/"]')
-                for link in brand_links:
-                    try:
-                        href = link.get_attribute('href') or ''
-                        
-                        # Skip if this is the current product
-                        if current_brand_id and current_brand_id in href:
-                            continue
-                        
-                        # Get store name from image alt
-                        store_name = None
-                        imgs = link.find_elements(By.TAG_NAME, 'img')
-                        for img in imgs:
-                            alt = img.get_attribute('alt')
-                            if alt and alt.strip():
-                                store_name = alt.strip()
-                                break
-                        
+                        # Validate and add
                         if store_name and self._is_valid_store_name(store_name):
                             raw_stores.add(store_name)
                             
