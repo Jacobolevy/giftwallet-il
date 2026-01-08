@@ -77,7 +77,7 @@ export const authAPI = {
 
 // Cards API
 export const cardsAPI = {
-  getAll: () => api.get('/cards'),
+  getAll: (params?: any) => api.get('/cards', { params }),
   getById: (id: string) =>
     api.get(`/cards/${id}`),
   create: (data: any) =>

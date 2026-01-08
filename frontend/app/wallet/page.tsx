@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import AppLayout from '@/components/layout/AppLayout';
+import FilterBar from '@/components/cards/FilterBar';
 import { authAPI, cardsAPI } from '@/lib/api';
 import { getTranslation } from '@/lib/translations';
 import { useAuthStore } from '@/lib/store';
@@ -28,6 +30,7 @@ interface Card {
 }
 
 export default function WalletPage() {
+  const searchParams = useSearchParams();
   const { user } = useAuthStore();
   const lang = user?.languagePreference || 'he';
   const t = useCallback((key: any) => getTranslation(lang, key), [lang]);
@@ -37,16 +40,28 @@ export default function WalletPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const cardsRes = await cardsAPI.getAll();
+      setLoading(true);
+      const params = {
+        search: searchParams.get('search') || undefined,
+        issuerId: searchParams.get('issuerId') || undefined,
+        category: searchParams.get('category') || undefined,
+        // isExpired defaults to undefined (show all) if not set.
+        // But if 'false' (from "Hide Expired" toggle), we pass false.
+        isExpired: searchParams.get('isExpired') === 'false' ? false : undefined,
+        minBalance: searchParams.get('minBalance') || undefined,
+        maxBalance: searchParams.get('maxBalance') || undefined,
+      };
+      
+      const cardsRes = await cardsAPI.getAll(params);
       const cardsData = cardsRes.data;
-      const cardsArray = Array.isArray(cardsData) ? cardsData : (cardsData?.cards ?? []);
+      const cardsArray = Array.isArray(cardsData) ? cardsData : (cardsData?.data || cardsData?.cards || []);
       setCards(cardsArray);
     } catch (error: any) {
       toast.error(error.response?.data?.error?.message || t('common_error'));
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [t, searchParams]);
 
   useEffect(() => {
     loadData();
@@ -87,6 +102,8 @@ export default function WalletPage() {
             <span>{t('profile_logout')}</span>
           </button>
         </div>
+
+        <FilterBar />
 
         {/* Cards Grid */}
         {cards.length === 0 ? (

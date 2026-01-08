@@ -57,14 +57,162 @@ export const createCard = async (data: CreateCardData) => {
   return card;
 };
 
-export const getCardsByUser = async (userId: string) => {
-  return prisma.userCard.findMany({
-    where: { userId },
-    include: {
-      cardProduct: { include: { issuer: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+export interface GetCardsOptions {
+  issuerId?: string;
+  storeId?: string;
+  category?: string;
+  minBalance?: number;
+  maxBalance?: number;
+  status?: string;
+  isExpired?: boolean;
+  search?: string;
+  sortBy?: string;
+  order?: 'asc' | 'desc';
+  skip?: number;
+  take?: number;
+}
+
+export const getCardsByUser = async (userId: string, options: GetCardsOptions = {}) => {
+  const {
+    issuerId,
+    storeId,
+    category,
+    minBalance,
+    maxBalance,
+    status,
+    isExpired,
+    search,
+    sortBy = 'createdAt',
+    order = 'desc',
+    skip = 0,
+    take = 50
+  } = options;
+
+  const andConditions: any[] = [{ userId }];
+
+  // Search: matches nickname or cardProduct name
+  if (search) {
+    andConditions.push({
+      OR: [
+        { nickname: { contains: search, mode: 'insensitive' } },
+        { cardProduct: { name: { contains: search, mode: 'insensitive' } } },
+      ],
+    });
+  }
+
+  // Filter by Issuer
+  if (issuerId) {
+    andConditions.push({
+      cardProduct: {
+        issuerId,
+      },
+    });
+  }
+
+  // Filter by Store Category
+  if (category) {
+    andConditions.push({
+      cardProduct: {
+        stores: {
+          some: {
+            store: {
+              category: {
+                contains: category,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // Filter by Store ID
+  if (storeId) {
+    andConditions.push({
+      cardProduct: {
+        stores: {
+          some: {
+            storeId: storeId,
+          },
+        },
+      },
+    });
+  }
+
+  // Filter by Status
+  if (status) {
+    // Validate status if necessary or let Prisma throw if invalid enum?
+    // Better to pass it through, controller handles validation or we handle it here.
+    // Assuming status is valid UserCardStatus string.
+    andConditions.push({ status: status as UserCardStatus });
+  }
+
+  // Filter by Balance Range
+  if (minBalance !== undefined || maxBalance !== undefined) {
+    const balanceCondition: any = {};
+    if (minBalance !== undefined) balanceCondition.gte = minBalance;
+    if (maxBalance !== undefined) balanceCondition.lte = maxBalance;
+    andConditions.push({ balance: balanceCondition });
+  }
+
+  // Filter by Expiration
+  if (isExpired !== undefined) {
+    const now = new Date();
+    if (isExpired) {
+      andConditions.push({ expiresAt: { lt: now } });
+    } else {
+      andConditions.push({
+        OR: [
+          { expiresAt: { gte: now } },
+          { expiresAt: null },
+        ],
+      });
+    }
+  }
+
+  const finalWhere = { AND: andConditions };
+
+  // Determine Sorting
+  let orderBy: any = {};
+  switch (sortBy) {
+    case 'expirationDate':
+    case 'expiresAt':
+      orderBy = { expiresAt: order };
+      break;
+    case 'balance':
+      orderBy = { balance: order };
+      break;
+    case 'createdAt':
+    default:
+      orderBy = { createdAt: order };
+      break;
+  }
+
+  const [cards, total] = await Promise.all([
+    prisma.userCard.findMany({
+      where: finalWhere,
+      include: {
+        cardProduct: {
+          include: {
+            issuer: true,
+            // Including stores might be heavy if there are many, but requested "relaciones necesarias"
+            // Usually issuer and cardProduct are enough for list.
+            // stores is available via another endpoint or if explicitly requested?
+            // Prompt says: "include (include) las relaciones necesarias en la respuesta (Issuer, CardProduct)"
+            // It doesn't explicitly say "Store", but "CardProduct -> Issuer" is there.
+            // I'll stick to what was there: cardProduct with issuer.
+          } 
+        },
+      },
+      orderBy,
+      skip,
+      take,
+    }),
+    prisma.userCard.count({ where: finalWhere }),
+  ]);
+
+  return { cards, total, skip, take };
 };
 
 export const getCardById = async (cardId: string, userId: string) => {

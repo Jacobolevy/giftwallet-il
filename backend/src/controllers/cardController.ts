@@ -37,30 +37,79 @@ export const createCard = async (req: AuthRequest, res: Response): Promise<void>
 
 export const getCards = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const cards = await cardService.getCardsByUser(req.userId!);
+    const { 
+      issuerId, 
+      storeId,
+      category, 
+      status,
+      minBalance, 
+      maxBalance, 
+      isExpired, 
+      search, 
+      sortBy,
+      order,
+      page, 
+      limit 
+    } = req.query;
+
+    const pageNum = page ? parseInt(page as string) : 1;
+    const limitNum = limit ? parseInt(limit as string) : 50;
+    const skip = (pageNum - 1) * limitNum;
+
+    // Validate Sort Order
+    const sortOrder = order === 'asc' ? 'asc' : 'desc';
+
+    const { cards, total } = await cardService.getCardsByUser(req.userId!, {
+      issuerId: issuerId as string,
+      storeId: storeId as string,
+      category: category as string,
+      status: status as string,
+      minBalance: minBalance ? parseFloat(minBalance as string) : undefined,
+      maxBalance: maxBalance ? parseFloat(maxBalance as string) : undefined,
+      isExpired: isExpired === 'true' ? true : isExpired === 'false' ? false : undefined,
+      search: search as string,
+      sortBy: sortBy as string,
+      order: sortOrder,
+      skip,
+      take: limitNum,
+    });
+
     sendSuccess(
       res,
-      cards.map((card) => ({
-        id: card.id,
-        cardProduct: {
-          id: card.cardProduct.id,
-          name: card.cardProduct.name,
-          issuer: {
-            id: card.cardProduct.issuer.id,
-            name: card.cardProduct.issuer.name,
-            logoUrl: card.cardProduct.issuer.logoUrl,
+      {
+        data: cards.map((card) => ({
+          id: card.id,
+          cardProduct: {
+            id: card.cardProduct.id,
+            name: card.cardProduct.name,
+            issuer: {
+              id: card.cardProduct.issuer.id,
+              name: card.cardProduct.issuer.name,
+              logoUrl: card.cardProduct.issuer.logoUrl,
+            },
           },
+          nickname: card.nickname,
+          codeLast4: card.codeLast4,
+          balance: Number(card.balance),
+          expiresAt: card.expiresAt,
+          status: card.status,
+          createdAt: card.createdAt,
+          updatedAt: card.updatedAt,
+        })),
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(total / limitNum),
         },
-        nickname: card.nickname,
-        codeLast4: card.codeLast4,
-        balance: Number(card.balance),
-        expiresAt: card.expiresAt,
-        status: card.status,
-        createdAt: card.createdAt,
-        updatedAt: card.updatedAt,
-      }))
+      }
     );
   } catch (error: any) {
+    // Basic error handling for invalid params if service throws
+    if (error.message.includes('Invalid')) {
+       sendError(res, 'VALIDATION_ERROR', error.message, 400);
+       return;
+    }
     sendError(res, 'INTERNAL_SERVER_ERROR', error.message, 500);
   }
 };

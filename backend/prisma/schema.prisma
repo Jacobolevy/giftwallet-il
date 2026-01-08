@@ -24,7 +24,11 @@ enum StoreAccessType {
 model User {
   id                        String   @id @default(uuid())
   email                     String   @unique
-  passwordHash              String   @map("password_hash")
+  passwordHash              String?  @map("password_hash")
+  googleId                  String?  @unique @map("google_id")
+  avatarUrl                 String?  @map("avatar_url")
+  provider                  String?  @default("local")
+  providerId                String?  @map("provider_id")
   phone                     String?
   name                      String?
   languagePreference        Language @default(he) @map("language_preference")
