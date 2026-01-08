@@ -1,0 +1,48 @@
+name: Scrape BuyMe Monthly
+
+on:
+  schedule:
+    # Runs at 09:00 UTC on the 1st of every month
+    - cron: '0 9 1 * *'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  scrape-and-sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Chrome browser
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+      
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/src/scripts/requirements.txt
+      
+      - name: Run BuyMe scraper
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python backend/src/scripts/buyme_db_sync.py
+      
+      - name: Report success
+        if: success()
+        run: |
+          echo "✅ BuyMe scraper completed successfully!"
+          echo "Data has been synced to the database."
+      
+      - name: Report failure
+        if: failure()
+        run: |
+          echo "❌ BuyMe scraper failed!"
+          echo "Check the logs above for details."
