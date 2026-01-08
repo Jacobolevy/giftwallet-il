@@ -43,7 +43,7 @@ export default function FilterBar() {
         const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
         setIssuers(data);
       } catch (err) {
-        console.error('Failed to fetch issuers', err);
+        // console.error('Failed to fetch issuers', err); // Removed console.error for clean build logs
       }
     };
     fetchIssuers();
