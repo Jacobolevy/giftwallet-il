@@ -50,6 +50,53 @@ class BuyMeDBSyncer:
         # Cache for store names -> store IDs (to avoid duplicate DB queries)
         self.store_cache: Dict[str, str] = {}  # normalized_name -> store_id
         
+    def _is_valid_store_name(self, name: str) -> bool:
+        """
+        Check if a name is a valid store name (not a category, UI element, etc.)
+        """
+        if not name or len(name) < 2 or len(name) > 80:
+            return False
+        
+        name_lower = name.lower().strip()
+        
+        # Skip if starts with Buyme (it's a product, not a store)
+        if name_lower.startswith('buyme'):
+            return False
+        
+        # Skip category names (Hebrew)
+        categories = {
+            'תינוקות וילדים', 'לבית', 'תרבות ופנאי', 'לגוף ולנפש',
+            'סדנאות והעשרה', 'מלונות ונופש', 'חוויות', 'ספא וימי כיף',
+            'מסעדות וקולינריה', 'מחבקים מילואימניקים', 'חדש על המדף',
+            'אופנה', 'יופי וטיפוח', 'טכנולוגיה', 'ספורט', 'לילדים',
+            'מתנות', 'גיפט קארד', 'הכל', 'הצג הכל', 'עוד',
+            'מסעדות', 'קולינריה', 'בתי קפה', 'ברים',
+        }
+        if name_lower in categories or name in categories:
+            return False
+        
+        # Skip UI elements
+        ui_elements = {
+            'חיפוש', 'search', 'חזרה', 'back', 'הבא', 'next', 'קודם', 'prev',
+            'סגור', 'close', 'פתח', 'open', 'שתף', 'share', 'menu', 'תפריט',
+            'מימוש אונליין', 'אזור', 'סנן', 'filter', 'area', 'location',
+            'הוראות מימוש', 'תנאי שימוש', 'מדיניות פרטיות', 'צור קשר',
+            'בתי עסק מכבדים', 'בתי עסק', 'איפה אפשר לממש',
+            'logo', 'icon', 'image', 'photo', 'arrow', 'chevron',
+        }
+        if name_lower in ui_elements or name in ui_elements:
+            return False
+        
+        # Skip if it's just numbers or prices
+        if re.match(r'^[\d₪\s\.,\-]+$', name):
+            return False
+        
+        # Skip URLs
+        if name.startswith('http') or name.startswith('www.'):
+            return False
+        
+        return True
+    
     def normalize_store_name(self, name: str) -> str:
         """
         Normalize store name for comparison and deduplication.
@@ -275,141 +322,75 @@ class BuyMeDBSyncer:
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(2)
             
-            # Method 1: Look for supplier/brand links (most reliable for BuyMe)
+            # FOCUSED METHOD: Only look for store links in the main content area
+            # Stores on BuyMe are shown as links to /supplier/ pages with images
+            # We need to be VERY selective to avoid capturing UI elements
+            
+            # Get the current product's supplier ID to exclude it
+            current_supplier_id = product_url.split('/supplier/')[-1].split('?')[0] if '/supplier/' in product_url else ''
+            current_brand_id = product_url.split('/brands/')[-1].split('?')[0] if '/brands/' in product_url else ''
+            
+            # Method 1: Look for supplier links that are NOT the current product
             try:
                 supplier_links = self.driver.find_elements(By.CSS_SELECTOR, 'a[href*="/supplier/"]')
                 for link in supplier_links:
                     try:
-                        # Get name from image alt
+                        href = link.get_attribute('href') or ''
+                        
+                        # Skip if this is the current product
+                        if current_supplier_id and current_supplier_id in href:
+                            continue
+                        
+                        # Skip navigation/header links (usually have specific classes)
+                        parent_classes = link.get_attribute('class') or ''
+                        if any(x in parent_classes.lower() for x in ['nav', 'header', 'menu', 'footer']):
+                            continue
+                        
+                        # Get store name from image alt (most reliable)
+                        store_name = None
                         imgs = link.find_elements(By.TAG_NAME, 'img')
                         for img in imgs:
                             alt = img.get_attribute('alt')
-                            if alt and alt.strip() and not alt.lower().startswith('buyme'):
-                                raw_stores.add(alt.strip())
+                            if alt and alt.strip():
+                                store_name = alt.strip()
+                                break
                         
-                        # Get name from link text
-                        text = link.text.strip()
-                        if text and len(text) < 100 and not text.lower().startswith('buyme'):
-                            # Split multi-line text and take first meaningful line
-                            lines = [l.strip() for l in text.split('\n') if l.strip()]
-                            for line in lines:
-                                if len(line) > 2 and len(line) < 80 and not line.lower().startswith('buyme'):
-                                    raw_stores.add(line)
+                        # Validate the store name
+                        if store_name and self._is_valid_store_name(store_name):
+                            raw_stores.add(store_name)
+                            
                     except Exception:
                         continue
             except Exception:
                 pass
             
-            # Method 2: Look for brand links
+            # Method 2: Look for brand links (alternative URL pattern)
             try:
                 brand_links = self.driver.find_elements(By.CSS_SELECTOR, 'a[href*="/brands/"]')
                 for link in brand_links:
                     try:
+                        href = link.get_attribute('href') or ''
+                        
+                        # Skip if this is the current product
+                        if current_brand_id and current_brand_id in href:
+                            continue
+                        
+                        # Get store name from image alt
+                        store_name = None
                         imgs = link.find_elements(By.TAG_NAME, 'img')
                         for img in imgs:
                             alt = img.get_attribute('alt')
-                            if alt and alt.strip() and not alt.lower().startswith('buyme'):
-                                raw_stores.add(alt.strip())
+                            if alt and alt.strip():
+                                store_name = alt.strip()
+                                break
                         
-                        text = link.text.strip()
-                        if text and len(text) < 100 and not text.lower().startswith('buyme'):
-                            lines = [l.strip() for l in text.split('\n') if l.strip()]
-                            for line in lines:
-                                if len(line) > 2 and len(line) < 80 and not line.lower().startswith('buyme'):
-                                    raw_stores.add(line)
+                        if store_name and self._is_valid_store_name(store_name):
+                            raw_stores.add(store_name)
+                            
                     except Exception:
                         continue
             except Exception:
                 pass
-            
-            # Method 3: Look for card/tile elements with store info
-            card_selectors = [
-                '[class*="card"]',
-                '[class*="tile"]',
-                '[class*="item"]',
-                '[class*="store"]',
-                '[class*="business"]',
-                '[class*="brand"]',
-                '[class*="partner"]',
-            ]
-            
-            for selector in card_selectors:
-                try:
-                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                    for element in elements:
-                        # Look for name in headings within the card
-                        try:
-                            headings = element.find_elements(By.CSS_SELECTOR, 'h1, h2, h3, h4, h5, h6, .title, .name')
-                            for heading in headings:
-                                text = heading.text.strip()
-                                if text and len(text) > 2 and len(text) < 80 and not text.lower().startswith('buyme'):
-                                    raw_stores.add(text)
-                        except Exception:
-                            pass
-                        
-                        # Look for name in image alt
-                        try:
-                            imgs = element.find_elements(By.TAG_NAME, 'img')
-                            for img in imgs:
-                                alt = img.get_attribute('alt')
-                                if alt and alt.strip() and len(alt) > 2 and len(alt) < 80 and not alt.lower().startswith('buyme'):
-                                    raw_stores.add(alt.strip())
-                        except Exception:
-                            pass
-                except Exception:
-                    continue
-            
-            # Method 4: Look for lists of businesses
-            try:
-                list_items = self.driver.find_elements(By.CSS_SELECTOR, 'ul li, ol li')
-                for item in list_items:
-                    text = item.text.strip()
-                    if (text and 
-                        len(text) < 80 and 
-                        len(text) > 2 and
-                        not text.lower().startswith('buyme') and
-                        not re.match(r'^[\d₪\s\.,]+$', text) and
-                        not text.startswith('http')):
-                        raw_stores.add(text)
-            except Exception:
-                pass
-            
-            # Method 5: Look for any image with meaningful alt text (store logos)
-            try:
-                all_images = self.driver.find_elements(By.TAG_NAME, 'img')
-                for img in all_images:
-                    alt = img.get_attribute('alt')
-                    if (alt and 
-                        len(alt.strip()) > 2 and 
-                        len(alt.strip()) < 80 and 
-                        not alt.lower().startswith('buyme') and
-                        not alt.lower() in ['logo', 'icon', 'image', 'photo']):
-                        raw_stores.add(alt.strip())
-            except Exception:
-                pass
-            
-            # Clean up and deduplicate stores
-            non_stores = {
-                # Navigation
-                'חזרה', 'הבא', 'קודם', 'סגור', 'פתח', 'הוסף', 'קנה', 'חיפוש',
-                'שתף', 'share', 'close', 'next', 'prev', 'back', 'search',
-                # Footer/Legal
-                'תנאי שימוש', 'מדיניות פרטיות', 'צור קשר', 'אודות',
-                'terms', 'privacy', 'contact', 'about', 'home', 'menu',
-                # Page sections
-                'איפה אפשר לממש', 'מידע נוסף', 'תיאור', 'פרטים',
-                'הוראות מימוש בבית העסק', 'בתי עסק מכבדים',
-                # Categories (from BuyMe)
-                'תינוקות וילדים', 'לבית', 'תרבות ופנאי', 'לגוף ולנפש',
-                'סדנאות והעשרה', 'מלונות ונופש', 'חוויות', 'ספא וימי כיף',
-                'מסעדות וקולינריה', 'מחבקים מילואימניקים', 'חדש על המדף',
-                'אופנה', 'יופי וטיפוח', 'טכנולוגיה', 'ספורט',
-                # UI elements
-                'מימוש אונליין', 'אזור', 'סנן', 'filter', 'area',
-                'logo', 'icon', 'image', 'photo', 'arrow',
-                # Generic
-                'עוד', 'more', 'all', 'הכל', 'ראה עוד', 'see more',
-            }
             
             # Deduplicate using normalized names
             seen_normalized = set()
@@ -419,12 +400,12 @@ class BuyMeDBSyncer:
                 clean = self.get_display_name(store)
                 normalized = self.normalize_store_name(clean)
                 
-                # Skip non-store items and duplicates
-                if normalized in non_stores or normalized in seen_normalized:
+                # Skip duplicates
+                if normalized in seen_normalized:
                     continue
-                    
-                # Skip very short or empty names
-                if len(normalized) < 2:
+                
+                # Double-check validity (in case something slipped through)
+                if not self._is_valid_store_name(clean):
                     continue
                 
                 seen_normalized.add(normalized)
