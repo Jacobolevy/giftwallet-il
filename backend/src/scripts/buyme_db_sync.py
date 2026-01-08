@@ -50,6 +50,34 @@ class BuyMeDBSyncer:
         # Cache for store names -> store IDs (to avoid duplicate DB queries)
         self.store_cache: Dict[str, str] = {}  # normalized_name -> store_id
         
+    def _get_expected_store_count(self) -> int:
+        """
+        Extract the expected store count from the page.
+        BuyMe shows this in: <span class="brands-page__results-count"><span>61</span> בתי עסק</span>
+        """
+        try:
+            # Try the specific BuyMe selector
+            count_element = self.driver.find_element(By.CSS_SELECTOR, '.brands-page__results-count span')
+            count_text = count_element.text.strip()
+            return int(count_text)
+        except Exception:
+            pass
+        
+        try:
+            # Alternative: look for text containing "בתי עסק"
+            elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'בתי עסק')]")
+            for el in elements:
+                text = el.text.strip()
+                # Extract number from text like "61 בתי עסק"
+                match = re.search(r'(\d+)\s*בתי עסק', text)
+                if match:
+                    return int(match.group(1))
+        except Exception:
+            pass
+        
+        # Default: unknown count
+        return 0
+    
     def _is_valid_store_name(self, name: str) -> bool:
         """
         Check if a name is a valid store name (not a category, UI element, etc.)
@@ -271,7 +299,7 @@ class BuyMeDBSyncer:
         """
         Scrape stores/businesses where a Buyme product can be redeemed.
         Returns normalized, deduplicated store names.
-        Handles lazy loading by scrolling until no new content loads.
+        Uses the page's store count to verify completeness.
         """
         logger.info(f"Scraping stores from {product_url}")
         
@@ -281,27 +309,30 @@ class BuyMeDBSyncer:
             self.driver.get(product_url)
             time.sleep(4)
             
-            # Aggressive scrolling to load ALL stores (handles lazy loading)
-            # Keep scrolling until no new content is loaded
-            last_height = 0
-            scroll_attempts = 0
-            max_scroll_attempts = 100  # Safety limit for pages with 1000+ items
+            # Get expected store count from the page
+            expected_count = self._get_expected_store_count()
+            logger.info(f"  Expected stores: {expected_count}")
             
-            logger.info("  Scrolling to load all stores (lazy loading)...")
+            # Smart scrolling: scroll until we've loaded all stores
+            scroll_attempts = 0
+            max_scroll_attempts = min(expected_count // 5 + 20, 150) if expected_count > 0 else 50
+            last_height = 0
+            
+            logger.info(f"  Scrolling to load all {expected_count} stores...")
             
             while scroll_attempts < max_scroll_attempts:
                 # Scroll down
                 self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(1.5)  # Wait for content to load
+                time.sleep(1.2)
                 
                 # Get new scroll height
                 new_height = self.driver.execute_script("return document.body.scrollHeight")
                 
                 # Check if we've reached the bottom
                 if new_height == last_height:
-                    # Try scrolling a bit more to trigger any remaining lazy loads
-                    self.driver.execute_script("window.scrollBy(0, 500);")
-                    time.sleep(1)
+                    time.sleep(0.5)
+                    self.driver.execute_script("window.scrollBy(0, 300);")
+                    time.sleep(0.8)
                     final_height = self.driver.execute_script("return document.body.scrollHeight")
                     if final_height == new_height:
                         logger.info(f"  Finished scrolling after {scroll_attempts} scrolls")
@@ -310,17 +341,15 @@ class BuyMeDBSyncer:
                 last_height = new_height
                 scroll_attempts += 1
                 
-                # Log progress every 10 scrolls
-                if scroll_attempts % 10 == 0:
-                    # Count current stores found
-                    current_count = len(self.driver.find_elements(By.CSS_SELECTOR, 'a[href*="/supplier/"], [class*="store"], [class*="business"], [class*="brand"]'))
-                    logger.info(f"  Scroll {scroll_attempts}: found ~{current_count} elements so far...")
+                # Log progress every 20 scrolls
+                if scroll_attempts % 20 == 0:
+                    logger.info(f"  Scroll {scroll_attempts}/{max_scroll_attempts}...")
             
-            # Scroll back to top and then down again to ensure all content is rendered
+            # Ensure all content is rendered
             self.driver.execute_script("window.scrollTo(0, 0);")
-            time.sleep(1)
+            time.sleep(0.5)
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(2)
+            time.sleep(1)
             
             # FOCUSED METHOD: Only look for store links in the main content area
             # Stores on BuyMe are shown as links to /supplier/ pages with images
@@ -411,7 +440,19 @@ class BuyMeDBSyncer:
                 seen_normalized.add(normalized)
                 clean_stores.add(clean)
             
-            logger.info(f"Found {len(clean_stores)} unique stores")
+            # Validate against expected count
+            actual_count = len(clean_stores)
+            if expected_count > 0:
+                accuracy = (actual_count / expected_count) * 100
+                if accuracy >= 90:
+                    logger.info(f"  ✓ Found {actual_count}/{expected_count} stores ({accuracy:.0f}%)")
+                elif accuracy >= 70:
+                    logger.warning(f"  ⚠ Found {actual_count}/{expected_count} stores ({accuracy:.0f}%) - some may be missing")
+                else:
+                    logger.warning(f"  ✗ Found only {actual_count}/{expected_count} stores ({accuracy:.0f}%) - check scraping logic")
+            else:
+                logger.info(f"  Found {actual_count} stores (expected count unknown)")
+            
             return clean_stores
             
         except Exception as e:
